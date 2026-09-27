@@ -1,0 +1,20 @@
+/bin/
+/dist/
+/coverage.out
+/coverage/
+.DS_Store
+
+# 在项目根目录执行 go build ./cmd/learn 产生的二进制
+/learn
+/learn.exe
+
+# 临时目录
+/tmp/
+
+# go test -c 产物
+*.test
+
+# 编辑器文件
+.idea/
+.vscode/
+*.swp

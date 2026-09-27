@@ -1,0 +1,7 @@
+# Imported binary source material is local by default.
+Sources/*/original/*.pdf
+
+# Runtime lock and temporary files.
+.learning/*.lock
+.learning/.learn-tmp-*
+.learning/backups/
