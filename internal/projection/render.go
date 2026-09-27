@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/curriculum"
 
-	"github.com/channelwill/learning-os/internal/learner"
-	"github.com/channelwill/learning-os/internal/policy"
+	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/policy"
 )
 
 var reviewLabel = map[string]string{"recalled": "想起", "partial": "部分想起", "forgotten": "忘记"}

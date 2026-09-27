@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/channelwill/learning-os/internal/mdblock"
+	"github.com/hedykan/learning-system/internal/mdblock"
 )
 
 func TestUpsertAndPreserve(t *testing.T) {

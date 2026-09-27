@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/curriculum"
-	"github.com/channelwill/learning-os/internal/vault"
+	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/vault"
 )
 
 func TestDetourStartEndRestoresReturnPoint(t *testing.T) {

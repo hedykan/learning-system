@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/fsutil"
 )
 
 const SchemaVersion = 1

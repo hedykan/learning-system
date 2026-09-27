@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/app"
+	"github.com/hedykan/learning-system/internal/app"
 )
 
 func TestCLIEndToEnd(t *testing.T) {

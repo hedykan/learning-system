@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/config"
-	"github.com/channelwill/learning-os/internal/conversation"
-	"github.com/channelwill/learning-os/internal/fsutil"
-	runtimeState "github.com/channelwill/learning-os/internal/runtime"
+	"github.com/hedykan/learning-system/internal/config"
+	"github.com/hedykan/learning-system/internal/conversation"
+	"github.com/hedykan/learning-system/internal/fsutil"
+	runtimeState "github.com/hedykan/learning-system/internal/runtime"
 	"gopkg.in/yaml.v3"
 )
 

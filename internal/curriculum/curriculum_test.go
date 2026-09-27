@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/config"
-	"github.com/channelwill/learning-os/internal/curriculum"
-	"github.com/channelwill/learning-os/internal/vault"
+	"github.com/hedykan/learning-system/internal/config"
+	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/vault"
 )
 
 func TestImportDryRunThenCommitAndRejectDuplicate(t *testing.T) {

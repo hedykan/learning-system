@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/channelwill/learning-os/internal/app"
+	"github.com/hedykan/learning-system/internal/app"
 )
 
 func main() {

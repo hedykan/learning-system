@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/channelwill/learning-os/internal/conversation"
+	"github.com/hedykan/learning-system/internal/conversation"
 )
 
 var AllowedEventTypes = map[string]bool{

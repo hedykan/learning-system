@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/assets"
-	"github.com/channelwill/learning-os/internal/config"
-	"github.com/channelwill/learning-os/internal/fsutil"
-	"github.com/channelwill/learning-os/internal/gitx"
-	runtimeState "github.com/channelwill/learning-os/internal/runtime"
+	"github.com/hedykan/learning-system/internal/assets"
+	"github.com/hedykan/learning-system/internal/config"
+	"github.com/hedykan/learning-system/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/gitx"
+	runtimeState "github.com/hedykan/learning-system/internal/runtime"
 	"gopkg.in/yaml.v3"
 )
 

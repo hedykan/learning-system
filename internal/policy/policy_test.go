@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/channelwill/learning-os/internal/conversation"
-	"github.com/channelwill/learning-os/internal/curriculum"
-	"github.com/channelwill/learning-os/internal/learner"
-	"github.com/channelwill/learning-os/internal/policy"
-	"github.com/channelwill/learning-os/internal/record"
+	"github.com/hedykan/learning-system/internal/conversation"
+	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/policy"
+	"github.com/hedykan/learning-system/internal/record"
 )
 
 // Every session uses the same script: assistant asks, learner answers twice.

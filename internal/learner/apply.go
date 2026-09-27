@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/channelwill/learning-os/internal/conversation"
-	"github.com/channelwill/learning-os/internal/record"
+	"github.com/hedykan/learning-system/internal/conversation"
+	"github.com/hedykan/learning-system/internal/record"
 )
 
 var (

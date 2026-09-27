@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/fsutil"
 	"gopkg.in/yaml.v3"
 )
 

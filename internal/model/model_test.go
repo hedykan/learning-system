@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/channelwill/learning-os/internal/model"
+	"github.com/hedykan/learning-system/internal/model"
 )
 
 func TestConservativeProviderOnlyExtractsExplicitQuestions(t *testing.T) {

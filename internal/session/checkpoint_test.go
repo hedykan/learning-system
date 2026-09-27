@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/assessment"
-	"github.com/channelwill/learning-os/internal/curriculum"
-	"github.com/channelwill/learning-os/internal/learner"
-	"github.com/channelwill/learning-os/internal/model"
-	"github.com/channelwill/learning-os/internal/projection"
-	"github.com/channelwill/learning-os/internal/record"
-	"github.com/channelwill/learning-os/internal/session"
+	"github.com/hedykan/learning-system/internal/assessment"
+	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/model"
+	"github.com/hedykan/learning-system/internal/projection"
+	"github.com/hedykan/learning-system/internal/record"
+	"github.com/hedykan/learning-system/internal/session"
 )
 
 func TestCheckpointEndAndRebuild(t *testing.T) {

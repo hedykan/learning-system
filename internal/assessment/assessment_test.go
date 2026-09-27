@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/assessment"
-	"github.com/channelwill/learning-os/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/assessment"
+	"github.com/hedykan/learning-system/internal/curriculum"
 )
 
 func TestValidateRequiresEvidenceFromUserTurns(t *testing.T) {

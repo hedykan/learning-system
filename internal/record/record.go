@@ -14,7 +14,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/channelwill/learning-os/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/fsutil"
 )
 
 const Schema = "learning-os/interpretation@1"

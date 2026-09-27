@@ -1,4 +1,4 @@
-module github.com/channelwill/learning-os
+module github.com/hedykan/learning-system
 
 go 1.23.0
 

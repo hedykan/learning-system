@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/conversation"
-	"github.com/channelwill/learning-os/internal/fsutil"
-	"github.com/channelwill/learning-os/internal/record"
+	"github.com/hedykan/learning-system/internal/conversation"
+	"github.com/hedykan/learning-system/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/record"
 )
 
 // VaultResolver reads turns from Vault conversations, caching parsed files.

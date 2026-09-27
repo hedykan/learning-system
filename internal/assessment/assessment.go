@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/conversation"
-	"github.com/channelwill/learning-os/internal/curriculum"
-	"github.com/channelwill/learning-os/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/conversation"
+	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/fsutil"
 )
 
 type Finding struct {

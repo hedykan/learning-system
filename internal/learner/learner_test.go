@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/conversation"
-	"github.com/channelwill/learning-os/internal/learner"
-	"github.com/channelwill/learning-os/internal/record"
+	"github.com/hedykan/learning-system/internal/conversation"
+	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/record"
 )
 
 // fakeResolver holds scripted conversations: session -> turns ("role|text").

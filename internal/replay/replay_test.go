@@ -12,14 +12,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/assessment"
-	"github.com/channelwill/learning-os/internal/curriculum"
-	"github.com/channelwill/learning-os/internal/learner"
-	"github.com/channelwill/learning-os/internal/model"
-	"github.com/channelwill/learning-os/internal/policy"
-	"github.com/channelwill/learning-os/internal/record"
-	"github.com/channelwill/learning-os/internal/session"
-	"github.com/channelwill/learning-os/internal/vault"
+	"github.com/hedykan/learning-system/internal/assessment"
+	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/model"
+	"github.com/hedykan/learning-system/internal/policy"
+	"github.com/hedykan/learning-system/internal/record"
+	"github.com/hedykan/learning-system/internal/session"
+	"github.com/hedykan/learning-system/internal/vault"
 )
 
 // Each session follows the same shape: the assistant asks, the learner gives

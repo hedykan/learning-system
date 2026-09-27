@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/vault"
+	"github.com/hedykan/learning-system/internal/vault"
 )
 
 func TestInitIsIdempotentAndPreservesAgentRules(t *testing.T) {

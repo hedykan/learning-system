@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/channelwill/learning-os/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/fsutil"
 )
 
 func TestWriteFileIfAbsentPreservesExistingContent(t *testing.T) {

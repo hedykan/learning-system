@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/conversation"
+	"github.com/hedykan/learning-system/internal/conversation"
 )
 
 const legacy = "---\nid: session-1\nkind: lesson\ncurriculum: \"ddia\"\n---\n\n# Raw Conversation\n\n## 2026-09-24T09:00:00Z — assistant\n\n> 你怎么看？\n\n## 2026-09-24T09:01:00Z — user\n\n> 第一行\n> \n> 第二行\n"

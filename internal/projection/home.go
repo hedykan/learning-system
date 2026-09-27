@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/channelwill/learning-os/internal/curriculum"
-	"github.com/channelwill/learning-os/internal/learner"
+	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/learner"
 )
 
 // renderHome renders the Vault's README.md home page.

@@ -10,13 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/channelwill/learning-os/internal/assessment"
-	"github.com/channelwill/learning-os/internal/config"
-	"github.com/channelwill/learning-os/internal/curriculum"
-	"github.com/channelwill/learning-os/internal/model"
-	runtimeState "github.com/channelwill/learning-os/internal/runtime"
-	"github.com/channelwill/learning-os/internal/session"
-	"github.com/channelwill/learning-os/internal/vault"
+	"github.com/hedykan/learning-system/internal/assessment"
+	"github.com/hedykan/learning-system/internal/config"
+	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/model"
+	runtimeState "github.com/hedykan/learning-system/internal/runtime"
+	"github.com/hedykan/learning-system/internal/session"
+	"github.com/hedykan/learning-system/internal/vault"
 )
 
 func TestAnalysisFailurePreservesActiveSessionAndRawConversation(t *testing.T) {

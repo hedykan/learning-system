@@ -10,16 +10,16 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/channelwill/learning-os/internal/assessment"
-	"github.com/channelwill/learning-os/internal/clock"
-	"github.com/channelwill/learning-os/internal/config"
-	"github.com/channelwill/learning-os/internal/conversation"
-	"github.com/channelwill/learning-os/internal/curriculum"
-	"github.com/channelwill/learning-os/internal/fsutil"
-	"github.com/channelwill/learning-os/internal/learner"
-	"github.com/channelwill/learning-os/internal/mdblock"
-	"github.com/channelwill/learning-os/internal/policy"
-	runtimeState "github.com/channelwill/learning-os/internal/runtime"
+	"github.com/hedykan/learning-system/internal/assessment"
+	"github.com/hedykan/learning-system/internal/clock"
+	"github.com/hedykan/learning-system/internal/config"
+	"github.com/hedykan/learning-system/internal/conversation"
+	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/mdblock"
+	"github.com/hedykan/learning-system/internal/policy"
+	runtimeState "github.com/hedykan/learning-system/internal/runtime"
 )
 
 // Inputs is everything a projection needs besides the model.
