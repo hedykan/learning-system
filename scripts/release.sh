@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build release packages for every supported platform into dist/:
-# macOS tar.gz, Windows zip, Linux AppImage and tar.gz, plus SHA256SUMS.txt.
+# plain macOS and Windows binaries, Linux AppImage and tar.gz, plus
+# SHA256SUMS.txt.
 #
 #   scripts/release.sh <tag> [source-dir]
 #
@@ -14,7 +15,7 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$(cd "${2:-$HERE}" && pwd)
 DIST=${DIST:-$HERE/dist}
 TOOLS=$DIST/.tools
-for tool in go tar zip curl file; do
+for tool in go tar curl file; do
   command -v "$tool" >/dev/null || { echo "release.sh needs '$tool' on PATH" >&2; exit 1; }
 done
 mkdir -p "$DIST" "$TOOLS"
@@ -31,20 +32,15 @@ build() { # goos goarch output [goarm]
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-# macOS: amd64 = x64, arm64 = Apple silicon.
+# macOS and Windows get the plain binary: an archive would only hold that
+# one file. macOS: amd64 = x64, arm64 = Apple silicon.
 for pair in amd64:x64 arm64:arm64; do
-  arch=${pair%%:*} name=${pair##*:}
-  mkdir -p "$work/macos-$name"
-  build darwin "$arch" "$work/macos-$name/learn"
-  tar -czf "$DIST/learn-$TAG-macos-$name.tar.gz" -C "$work/macos-$name" learn
+  build darwin "${pair%%:*}" "$DIST/learn-$TAG-macos-${pair##*:}"
 done
 
 # Windows: 386 = x86, amd64 = x64, arm64.
 for pair in 386:x86 amd64:x64 arm64:arm64; do
-  arch=${pair%%:*} name=${pair##*:}
-  mkdir -p "$work/windows-$name"
-  build windows "$arch" "$work/windows-$name/learn.exe"
-  (cd "$work/windows-$name" && zip -q "$DIST/learn-$TAG-windows-$name.zip" learn.exe)
+  build windows "${pair%%:*}" "$DIST/learn-$TAG-windows-${pair##*:}.exe"
 done
 
 # Linux: AppImages. goarch:goarm:appimage-arch:name

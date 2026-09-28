@@ -11,7 +11,7 @@ learn version
 
 安装目标为 Go 标准的 `GOBIN`，未设置时使用 `GOPATH/bin`。该目录需要在 `PATH` 中。
 
-发布：推送 `v*` 标签时，GitHub Actions（`.github/workflows/release.yml`）运行测试并用 `scripts/release.sh` 打包 macOS（x64、arm64，tar.gz）、Windows（x86、x64、arm64，zip）与 Linux（x86、x64、arm64、armv7，AppImage 与 tar.gz），连同 `SHA256SUMS.txt` 上传到同名 Release，说明取自 CHANGELOG 对应段落。打包前校验 `learn version` 与标签一致。手动运行工作流并填入已有标签可补发旧版本。
+发布：推送 `v*` 标签时，GitHub Actions（`.github/workflows/release.yml`）运行测试并用 `scripts/release.sh` 打包 macOS（x64、arm64，裸二进制）、Windows（x86、x64、arm64，`.exe`）与 Linux（x86、x64、arm64、armv7，AppImage 与 tar.gz），连同 `SHA256SUMS.txt` 上传到同名 Release，说明取自 CHANGELOG 对应段落。打包前校验 `learn version` 与标签一致。手动运行工作流并填入已有标签可补发旧版本。
 
 ## Vault
 

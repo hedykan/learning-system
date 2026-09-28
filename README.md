@@ -113,14 +113,14 @@ AI 可以重新判断你是否真正理解了一个概念，但已经发生过�
 
 | 系统 | x86（32 位） | x64 | ARM |
 | --- | --- | --- | --- |
-| macOS | — | `learn-<版本>-macos-x64.tar.gz` | `learn-<版本>-macos-arm64.tar.gz`（Apple 芯片） |
-| Windows | `learn-<版本>-windows-x86.zip` | `learn-<版本>-windows-x64.zip` | `learn-<版本>-windows-arm64.zip` |
+| macOS | — | `learn-<版本>-macos-x64` | `learn-<版本>-macos-arm64`（Apple 芯片） |
+| Windows | `learn-<版本>-windows-x86.exe` | `learn-<版本>-windows-x64.exe` | `learn-<版本>-windows-arm64.exe` |
 | Linux | `learn-<版本>-linux-x86.AppImage` | `learn-<版本>-linux-x64.AppImage` | `learn-<版本>-linux-arm64.AppImage`、`learn-<版本>-linux-armv7.AppImage` |
 
 Linux 每种架构还提供同名的 `.tar.gz`，里面是普通二进制，适合服务器和容器。
 
-- **macOS**：解压后把 `learn` 放到 PATH 中的目录（如 `/usr/local/bin`）。浏览器下载的文件会被系统拦截，先运行一次 `xattr -d com.apple.quarantine learn`。
-- **Windows**：解压后把 `learn.exe` 所在目录加入 PATH。
+- **macOS**：改名为 `learn`，运行 `chmod +x learn`；浏览器下载的文件会被系统拦截，再运行一次 `xattr -d com.apple.quarantine learn`，然后放到 PATH 中的目录（如 `/usr/local/bin`）。
+- **Windows**：改名为 `learn.exe`，把它所在的目录加入 PATH。
 - **Linux**：`chmod +x learn-*.AppImage`，改名为 `learn` 放到 PATH 中。没有 FUSE 的环境（如容器内）改用 `.tar.gz`，解压即可运行。
 
 `SHA256SUMS.txt` 可用来校验下载的文件。

@@ -1,5 +1,9 @@
 # Changelog
 
+## 未发布
+
+- 发布包：macOS 与 Windows 改为直接提供二进制（不再打 tar.gz、zip，包里本来只有这一个文件）；Linux 仍提供 AppImage 与 tar.gz。
+
 ## v0.1.8 — 2026-09-28
 
 - 三段学习流程：资料搜集 → 学习 → 巩固。`learn next` 输出 `stage`，Vault 首页按三段组织。
