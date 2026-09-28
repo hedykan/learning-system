@@ -13,7 +13,7 @@
 7. [质量属性](./quality.md)
 8. [核心验证场景](./validation-scenarios.md)：每个版本发布前必须用真实 Agent 复现的 17 个场景
 9. [提案](./proposals/)：尚未转成变更单的整体设计想法，如 [Curriculum Builder](./proposals/curriculum-builder.md)
-10. [v0.2 基线](./versions/v0.2.md)（当前版本：Curriculum Builder）；[v0.1.9 基线](./versions/v0.1.9.md)；[v0.1.8 基线](./versions/v0.1.8.md)；[v0.1.7 基线](./versions/v0.1.7.md)；[v0.1.6 基线](./versions/v0.1.6.md)；[v0.1.5 基线](./versions/v0.1.5.md)；[v0.1.4 基线](./versions/v0.1.4.md)；[v0.1.3 基线](./versions/v0.1.3.md)；[v0.1.2 基线](./versions/v0.1.2.md)；[v0.1.1 基线](./versions/v0.1.1.md)
+10. [v0.2.1 基线](./versions/v0.2.1.md)（下一版本：入学）；[v0.2 基线](./versions/v0.2.md)（当前版本：Curriculum Builder）；[v0.1.9 基线](./versions/v0.1.9.md)；[v0.1.8 基线](./versions/v0.1.8.md)；[v0.1.7 基线](./versions/v0.1.7.md)；[v0.1.6 基线](./versions/v0.1.6.md)；[v0.1.5 基线](./versions/v0.1.5.md)；[v0.1.4 基线](./versions/v0.1.4.md)；[v0.1.3 基线](./versions/v0.1.3.md)；[v0.1.2 基线](./versions/v0.1.2.md)；[v0.1.1 基线](./versions/v0.1.1.md)
 
 ## 需求状态
 
