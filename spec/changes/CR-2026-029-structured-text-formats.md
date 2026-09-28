@@ -2,7 +2,7 @@
 id: CR-2026-029
 title: "文字类格式：HTML、EPUB、DOCX、Jupyter、LaTeX 等"
 status: accepted
-target_version: v0.1.8
+target_version: v0.1.9
 created: 2026-09-28
 ---
 
@@ -48,4 +48,4 @@ created: 2026-09-28
 
 ## 决策
 
-2026-09-28 接受，排入 v0.1.8。
+2026-09-28 接受，排入 v0.1.8；同日随版本拆分移至 v0.1.9。

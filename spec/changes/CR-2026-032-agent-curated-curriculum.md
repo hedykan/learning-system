@@ -1,8 +1,8 @@
 ---
 id: CR-2026-032
 title: "Agent 搜集资料、组织课程"
-status: accepted
-target_version: v0.1.8
+status: deferred
+target_version: v0.2
 created: 2026-09-28
 ---
 
@@ -44,4 +44,4 @@ created: 2026-09-28
 
 ## 决策
 
-2026-09-28 接受，排入 v0.1.8。
+2026-09-28 接受，排入 v0.1.8；同日随版本拆分移至 v0.2，并将按 [Curriculum Builder](../proposals/curriculum-builder.md) 重写后重新评审。

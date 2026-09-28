@@ -10,7 +10,7 @@
 | IDEA-004 | Claude/Codex 宿主 Hook 自动捕获对话 | deferred | 2026-09-26：继续由 Skill 保证 Agent 逐轮记录 |
 | IDEA-005 | 真实 AI Provider 分析 Session | rejected | 2026-09-26：语义分析由 Agent 完成，程序不内置模型调用 |
 | IDEA-006 | 教材版本升级后的章节位置映射 | idea | backlog |
-| IDEA-007 | 将 Git 代码项目作为 Project Source 导入并按 revision 学习 | accepted | v0.1.8（见 CR-2026-030） |
+| IDEA-007 | 将 Git 代码项目作为 Project Source 导入并按 revision 学习 | accepted | v0.1.9（见 CR-2026-030） |
 | IDEA-008 | Source 验证、可恢复删除/重导入与 Session 中止 | implemented | Session 中止与位置重置已在 v0.1.1 实现；Source 验证并入 CR-2026-005；删除、归档、恢复进入 v0.1.4（见 CR-2026-001） |
 | IDEA-009 | 首次学习摸底、例子优先与术语预算 | implemented | v0.1.1（见 CR-2026-002） |
 | IDEA-010 | 证据驱动的知识沉淀、Cognitive History 与长期 Learner Model | implemented | v0.1.2（见 CR-2026-004） |
@@ -33,9 +33,12 @@
 | IDEA-028 | 教材文件夹整理：去掉与教材首页重复的 book.md，隐藏运行时状态文件 | idea | 下一版本候选 |
 | IDEA-024 | 自发检索提示：记录中出现对早先 Session 已学概念的使用、却没有 retrieval 事件时，checkpoint 输出提示 Agent 核对是否为自发检索 | idea | 下一版本候选 |
 | IDEA-029 | 通用定位与资料适配器接口，课程挂多份资料 | accepted | v0.1.8（见 CR-2026-025 至 027） |
-| IDEA-030 | 没有文件的资料（视频课、纸质书）与文字类格式（HTML、EPUB、DOCX 等） | accepted | v0.1.8（见 CR-2026-028、029） |
-| IDEA-031 | 网址抓取快照与 Agent 搜集资料组织课程 | accepted | v0.1.8（见 CR-2026-031、032） |
+| IDEA-030 | 没有文件的资料（视频课、纸质书）与文字类格式（HTML、EPUB、DOCX 等） | accepted | 外部资料 v0.1.8（CR-2026-028）；文字类格式 v0.1.9（CR-2026-029） |
+| IDEA-031 | 网址抓取快照与 Agent 搜集资料组织课程 | accepted | 网址快照 v0.1.9（CR-2026-031）；组织课程 v0.2（CR-2026-032） |
 | IDEA-032 | 对话中的数学公式用终端可读的符号 | accepted | v0.1.8（见 CR-2026-033） |
+| IDEA-033 | 学习流程简化为三段：资料搜集 → 学习 → 巩固 | accepted | v0.1.8（见 CR-2026-034） |
+| IDEA-034 | Obsidian 图谱整理：按层打标签、证据链接收敛、关系类型与单向链接 | accepted | v0.1.8（见 CR-2026-035 至 037） |
+| IDEA-035 | Curriculum Builder：Source-aligned 与 Synthesized 课程、Topic 先修与来源、有证据的课程调整、跨课程复用已学概念（见 [proposals/curriculum-builder.md](./proposals/curriculum-builder.md)） | idea | v0.2（将重写 CR-2026-032） |
 
 ## IDEA-007 初步边界
 
