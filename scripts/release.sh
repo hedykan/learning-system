@@ -14,6 +14,9 @@ HERE=$(cd "$(dirname "$0")/.." && pwd)
 SRC=$(cd "${2:-$HERE}" && pwd)
 DIST=${DIST:-$HERE/dist}
 TOOLS=$DIST/.tools
+for tool in go tar zip curl file; do
+  command -v "$tool" >/dev/null || { echo "release.sh needs '$tool' on PATH" >&2; exit 1; }
+done
 mkdir -p "$DIST" "$TOOLS"
 rm -f "$DIST"/learn-* "$DIST"/SHA256SUMS.txt
 
