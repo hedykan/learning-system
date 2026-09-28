@@ -113,11 +113,11 @@ func TestTextPdfAndExternal(t *testing.T) {
 	if ext.Validate("", locator.Locator{Kind: "anchor", Value: "#x"}) == nil {
 		t.Fatal("external accepted an anchor")
 	}
-	epub := filepath.Join(dir, "book.epub")
-	write(t, epub, "x")
-	info, _ := os.Stat(epub)
-	if _, err := Detect(epub, info); err == nil || !strings.Contains(err.Error(), "unsupported source format") {
-		t.Fatalf("epub err = %v", err)
+	mobi := filepath.Join(dir, "book.mobi")
+	write(t, mobi, "x")
+	info, _ := os.Stat(mobi)
+	if _, err := Detect(mobi, info); err == nil || !strings.Contains(err.Error(), "unsupported source format") {
+		t.Fatalf("mobi err = %v", err)
 	}
 }
 

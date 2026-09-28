@@ -34,6 +34,29 @@ type Manifest struct {
 	// URL and Note describe external material (CR-2026-028).
 	URL  string `yaml:"url,omitempty" json:"url,omitempty"`
 	Note string `yaml:"note,omitempty" json:"note,omitempty"`
+	// Revisions are the commits of a code project or the snapshots of a
+	// web page, oldest first; the last is current (CR-2026-030, 031).
+	Revisions []Revision `yaml:"revisions,omitempty" json:"revisions,omitempty"`
+	// Fetch repeats a web snapshot on refresh.
+	Fetch *FetchSpec `yaml:"fetch,omitempty" json:"fetch,omitempty"`
+}
+
+// FetchSpec is how a web snapshot was taken.
+type FetchSpec struct {
+	URL      string `yaml:"url" json:"url"`
+	Sitemap  string `yaml:"sitemap,omitempty" json:"sitemap,omitempty"`
+	Prefix   string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
+	MaxPages int    `yaml:"max_pages,omitempty" json:"max_pages,omitempty"`
+}
+
+// Revision is one recorded version of a code project or web snapshot.
+type Revision struct {
+	Commit    string `yaml:"commit,omitempty" json:"commit,omitempty"`
+	Branch    string `yaml:"branch,omitempty" json:"branch,omitempty"`
+	Dirty     bool   `yaml:"dirty,omitempty" json:"dirty,omitempty"`
+	SHA256    string `yaml:"sha256,omitempty" json:"sha256,omitempty"`
+	Snapshot  string `yaml:"snapshot,omitempty" json:"snapshot,omitempty"`
+	CreatedAt string `yaml:"created_at" json:"created_at"`
 }
 
 type Position struct {
@@ -69,9 +92,15 @@ type ImportOptions struct {
 	SourcePath string
 	// External creates a curriculum without a file (a video course, a paper
 	// book, a class); Title is required and URL/Note describe it.
-	External  bool
-	URL       string
-	Note      string
+	External bool
+	URL      string
+	Note     string
+	// Kind forces an adapter that is never auto-detected, e.g. "code".
+	Kind string
+	// Fetch options when SourcePath is an http(s) URL.
+	Sitemap   string
+	Prefix    string
+	MaxPages  int
 	ID        string
 	Title     string
 	Mode      string
@@ -91,6 +120,9 @@ type ImportPlan struct {
 	SHA256      string `json:"sha256"`
 	Activate    bool   `json:"activate"`
 	Duplicate   string `json:"duplicate,omitempty"`
+	Warning     string `json:"warning,omitempty"`
+	Pages       int    `json:"pages,omitempty"`
+	Commit      string `json:"commit,omitempty"`
 	ArchivedAs  string `json:"archived_match,omitempty"`
 	DryRun      bool   `json:"dry_run"`
 }
@@ -101,6 +133,15 @@ func Import(root string, opts ImportOptions) (ImportPlan, error) {
 	}
 	if opts.External {
 		return importExternal(root, opts)
+	}
+	if opts.Kind == "code" {
+		return importCode(root, opts)
+	}
+	if IsURL(opts.SourcePath) {
+		return importWeb(root, opts)
+	}
+	if opts.Kind != "" {
+		return ImportPlan{}, fmt.Errorf("unknown --kind %q; only code needs to be given, other formats are detected", opts.Kind)
 	}
 	if opts.Mode == "" {
 		opts.Mode = "copy"
@@ -182,6 +223,110 @@ func Import(root string, opts ImportOptions) (ImportPlan, error) {
 	return plan, nil
 }
 
+// IsURL reports whether a source argument is a web address.
+func IsURL(s string) bool { return strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") }
+
+// importWeb snapshots a page or a site into the Vault; learning then reads
+// the snapshot offline.
+func importWeb(root string, opts ImportOptions) (ImportPlan, error) {
+	spec := FetchSpec{URL: opts.SourcePath, Sitemap: opts.Sitemap, Prefix: opts.Prefix, MaxPages: opts.MaxPages}
+	title := strings.TrimSpace(opts.Title)
+	if title == "" {
+		title = opts.SourcePath
+	}
+	plan := ImportPlan{ID: opts.ID, Title: title, Kind: "web", Mode: "copy", SourcePath: opts.SourcePath,
+		Destination: filepath.Join(root, "Sources", opts.ID), Activate: opts.Activate, DryRun: opts.DryRun}
+	if _, err := os.Stat(plan.Destination); err == nil {
+		return plan, fmt.Errorf("%w: id %s", ErrAlreadyImported, opts.ID)
+	}
+	if opts.DryRun {
+		return plan, nil // a dry run never touches the network
+	}
+	if !opts.Confirmed {
+		return plan, fmt.Errorf("import requires --yes after reviewing a dry run")
+	}
+	if opts.Now.IsZero() {
+		opts.Now = time.Now()
+	}
+	rev, pages, err := snapshotInto(root, opts.ID, spec, 1, opts.Now)
+	if err != nil {
+		os.RemoveAll(plan.Destination)
+		return plan, err
+	}
+	plan.SHA256, plan.Pages = rev.SHA256, pages
+	manifest := Manifest{Version: 1, ID: opts.ID, Title: title, Kind: "web", Mode: "copy", URL: opts.SourcePath,
+		SHA256: rev.SHA256, ImportedAt: rev.CreatedAt, Revisions: []Revision{rev}, Fetch: &spec}
+	data, err := yaml.Marshal(manifest)
+	if err != nil {
+		return plan, err
+	}
+	if err := fsutil.WriteFileAtomic(filepath.Join(plan.Destination, "manifest.yaml"), data, 0o644); err != nil {
+		return plan, err
+	}
+	if err := writeCurriculum(root, manifest, filepath.Join(plan.Destination, "original", rev.Snapshot)); err != nil {
+		return plan, err
+	}
+	if opts.Activate {
+		if err := Activate(root, opts.ID); err != nil {
+			return plan, err
+		}
+	}
+	return plan, nil
+}
+
+// importCode links a Git project at its current commit; nothing is copied.
+func importCode(root string, opts ImportOptions) (ImportPlan, error) {
+	repo, err := filepath.Abs(opts.SourcePath)
+	if err != nil {
+		return ImportPlan{}, err
+	}
+	rev, err := source.ProjectRevision(repo)
+	if err != nil {
+		return ImportPlan{}, err
+	}
+	title := strings.TrimSpace(opts.Title)
+	if title == "" {
+		title = filepath.Base(repo)
+	}
+	plan := ImportPlan{ID: opts.ID, Title: title, Kind: "code", Mode: "link", SourcePath: repo, Commit: rev.Commit,
+		Destination: filepath.Join(root, "Sources", opts.ID), SHA256: "git:" + rev.Commit, Activate: opts.Activate, DryRun: opts.DryRun}
+	if rev.Dirty {
+		plan.Warning = "the project has uncommitted changes; only committed content at " + rev.Commit[:7] + " is used"
+	}
+	if _, err := os.Stat(plan.Destination); err == nil {
+		return plan, fmt.Errorf("%w: id %s", ErrAlreadyImported, opts.ID)
+	}
+	if opts.DryRun {
+		return plan, nil
+	}
+	if !opts.Confirmed {
+		return plan, fmt.Errorf("import requires --yes after reviewing a dry run")
+	}
+	if opts.Now.IsZero() {
+		opts.Now = time.Now()
+	}
+	at := opts.Now.UTC().Format(time.RFC3339)
+	manifest := Manifest{Version: 1, ID: opts.ID, Title: title, Kind: "code", Mode: "link", OriginalName: filepath.Base(repo),
+		OriginalPath: repo, SHA256: plan.SHA256, ImportedAt: at,
+		Revisions: []Revision{{Commit: rev.Commit, Branch: rev.Branch, Dirty: rev.Dirty, CreatedAt: at}}}
+	data, err := yaml.Marshal(manifest)
+	if err != nil {
+		return plan, err
+	}
+	if err := fsutil.WriteFileAtomic(filepath.Join(plan.Destination, "manifest.yaml"), data, 0o644); err != nil {
+		return plan, err
+	}
+	if err := writeCurriculum(root, manifest, ""); err != nil {
+		return plan, err
+	}
+	if opts.Activate {
+		if err := Activate(root, opts.ID); err != nil {
+			return plan, err
+		}
+	}
+	return plan, nil
+}
+
 // importExternal registers material that has no file. Its outline is built
 // by the Agent from a playlist, a photo of the contents page or a syllabus.
 func importExternal(root string, opts ImportOptions) (ImportPlan, error) {
@@ -230,6 +375,11 @@ func sourceKind(path string, info fs.FileInfo) (string, error) {
 	a, err := source.Detect(path, info)
 	if err != nil {
 		return "", err
+	}
+	if c, ok := a.(source.Checker); ok {
+		if err := c.Check(path); err != nil {
+			return "", err
+		}
 	}
 	return a.Kind(), nil
 }

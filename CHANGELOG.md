@@ -1,7 +1,10 @@
 # Changelog
 
-## 未发布
+## v0.1.9 — 2026-09-28
 
+- 更多资料格式：EPUB（按书内目录生成草稿，拒绝 DRM 版本）、HTML、Word、Jupyter、LaTeX、reStructuredText、AsciiDoc、Org，以及混合这些格式的文件夹；都可以用 `learn source read` 按标题锚点或章节读取原文。
+- 代码项目：`--kind code` 以链接方式导入 Git 项目，按提交读取文件，凭据、依赖、构建目录与二进制文件不可读；`learn source refresh` 记录新提交，旧记录仍指向原来的提交。
+- 网址：`learn curriculum import <url>`（可加 `--sitemap`、`--prefix`）抓取网页或整本在线书的快照，之后离线学习；遵守 robots.txt 并限速；在 Agent 沙箱内连不上网时给出明确说明。
 - 发布包：macOS 与 Windows 改为直接提供二进制（不再打 tar.gz、zip，包里本来只有这一个文件）；Linux 仍提供 AppImage 与 tar.gz。
 
 ## v0.1.8 — 2026-09-28

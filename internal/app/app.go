@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.1.8"
+const Version = "0.1.9"
 
 type App struct {
 	Out      io.Writer
@@ -403,7 +403,8 @@ func (a *App) curriculumListCommand(explicitVault *string) *cobra.Command {
 }
 
 func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
-	var id, title, url, note string
+	var id, title, url, note, kind, sitemap, prefix string
+	var maxPages int
 	var copyMode, linkMode, activate, dryRun, confirmed, asJSON, external bool
 	cmd := &cobra.Command{
 		Use: "import <path> | --external --title <name>", Short: "Import learning material, or register material without a file", Args: cobra.MaximumNArgs(1),
@@ -427,7 +428,7 @@ func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
 				mode = "link"
 			}
 			plan, err := curriculum.Import(root, curriculum.ImportOptions{
-				SourcePath: path, External: external, URL: url, Note: note, ID: id, Title: title, Mode: mode, Activate: activate,
+				SourcePath: path, External: external, URL: url, Note: note, Kind: kind, Sitemap: sitemap, Prefix: prefix, MaxPages: maxPages, ID: id, Title: title, Mode: mode, Activate: activate,
 				DryRun: dryRun, Confirmed: confirmed, Now: a.Now(),
 			})
 			if err != nil {
@@ -460,6 +461,8 @@ func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
 	cmd.Flags().BoolVar(&external, "external", false, "material without a file: a video course, paper book or class")
 	cmd.Flags().StringVar(&url, "url", "", "where the external material is (e.g. a playlist)")
 	cmd.Flags().StringVar(&note, "note", "", "publication details of the external material")
+	cmd.Flags().StringVar(&kind, "kind", "", "force a kind that is never detected: code (a Git project, linked and read at a commit)")
+	addFetchFlags(cmd, &sitemap, &prefix, &maxPages)
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate and print the import plan without writing")
 	cmd.Flags().BoolVar(&confirmed, "yes", false, "confirm the import plan")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")

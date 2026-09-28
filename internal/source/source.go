@@ -27,6 +27,8 @@ type Section struct {
 	Title  string `json:"title"`
 	Anchor string `json:"anchor"`
 	File   string `json:"file,omitempty"` // file within a folder resource
+	// Chapter is the e-book chapter locator value of the section.
+	Chapter string `json:"chapter,omitempty"`
 }
 
 // Content is text extracted at a locator, always as Markdown.
@@ -58,16 +60,32 @@ type Adapter interface {
 	Validate(path string, loc locator.Locator) error
 }
 
+// Checker is implemented by adapters that can refuse a file outright, such
+// as a DRM-protected e-book; importers call it before storing the file.
+type Checker interface {
+	Check(path string) error
+}
+
 var registry []Adapter
 
 // Register adds an adapter; earlier registrations win on Detect.
 func Register(a Adapter) { registry = append(registry, a) }
 
 func init() {
-	Register(markdownAdapter{})
+	Register(docAdapter{kind: "markdown", exts: []string{".md", ".markdown"}, load: fileDocs(parseMarkdown), lineFiles: true})
 	Register(folderAdapter{})
-	Register(textAdapter{})
+	Register(newText())
+	Register(docAdapter{kind: "html", exts: []string{".html", ".htm", ".xhtml"}, load: fileDocs(parseHTML)})
+	Register(docAdapter{kind: "epub", exts: []string{".epub"}, load: loadEPUB, chapters: true, outline: epubOutline, check: checkEPUB})
+	Register(docAdapter{kind: "docx", exts: []string{".docx"}, load: fileDocs(parseDOCX)})
+	Register(docAdapter{kind: "ipynb", exts: []string{".ipynb"}, load: fileDocs(parseNotebook)})
+	Register(docAdapter{kind: "latex", exts: []string{".tex"}, load: fileDocs(parseLaTeX), lineFiles: true})
+	Register(docAdapter{kind: "rst", exts: []string{".rst"}, load: fileDocs(parseRST), lineFiles: true})
+	Register(docAdapter{kind: "asciidoc", exts: []string{".adoc", ".asciidoc"}, load: fileDocs(parseAsciiDoc), lineFiles: true})
+	Register(docAdapter{kind: "org", exts: []string{".org"}, load: fileDocs(parseOrg), lineFiles: true})
 	Register(pdfAdapter{})
+	Register(codeAdapter{})
+	Register(webAdapter{})
 	Register(externalAdapter{})
 }
 

@@ -95,6 +95,7 @@ func Attach(root, id, node string, loc locator.Locator) (NodeResource, error) {
 	if ref.Primary && loc.Resource != id {
 		return NodeResource{}, fmt.Errorf("%s is the material of another curriculum; add the file again as a resource with `learn source add` to share it", loc.Resource)
 	}
+	loc = ref.pin(loc) // a code position keeps pointing at the commit it was read at
 	if err := ref.Validate(loc); err != nil {
 		return NodeResource{}, fmt.Errorf("locator for %s: %w", loc.Resource, err)
 	}

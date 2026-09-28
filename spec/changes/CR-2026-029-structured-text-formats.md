@@ -1,7 +1,7 @@
 ---
 id: CR-2026-029
 title: "文字类格式：HTML、EPUB、DOCX、Jupyter、LaTeX 等"
-status: accepted
+status: implemented
 target_version: v0.1.9
 created: 2026-09-28
 ---
@@ -49,3 +49,5 @@ created: 2026-09-28
 ## 决策
 
 2026-09-28 接受，排入 v0.1.8；同日随版本拆分移至 v0.1.9。
+
+2026-09-28 实现：HTML（`golang.org/x/net/html` v0.38.0，保持 Go 1.23）、EPUB（EPUB 3 nav 与 EPUB 2 NCX，检测 DRM）、DOCX（经 styles.xml 识别标题样式，兼容中文 Word 的样式 ID）、Jupyter、LaTeX、reStructuredText、AsciiDoc、Org；各格式转换为统一的文档模型后共用目录与锚点读取。与原设计的差异：DOCX 用 anchor 而不是 chapter 定位；文件夹与网页快照也接受 `文件#锚点` 形式的 chapter 定位，锚点在多个文件中重复时报错并给出该写法。真实《Pro Git》EPUB 的草稿目录与书内目录一致（19 章）。

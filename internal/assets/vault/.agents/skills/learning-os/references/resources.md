@@ -16,13 +16,19 @@ A locator says where in a resource something is: `{"resource": "<id>", "kind": "
 | Kind | Value | For |
 | --- | --- | --- |
 | `page` | `42-45` | PDF, paper books |
-| `anchor` | `#replication-lag` (heading slug) | Markdown |
-| `file` | `ch05.md#L10-40` | lines of a text or Markdown file |
+| `anchor` | `#replication-lag` (heading slug or id) | Markdown, HTML, Word, notebooks, LaTeX, rst, AsciiDoc, Org |
+| `file` | `ch05.md#L10-40`, `src/raft.go#L120-180@a1b2c3d` | lines of a plain-text file; code, pinned to a commit |
 | `time` | `3/05:20-48:00` (episode/start-end) | video and audio |
-| `chapter` | `ch05.xhtml#sec2` | e-books |
+| `chapter` | `ch05.xhtml#sec2`, `0010-ch6.html#6-复制` | e-book chapters; one file of a folder or web snapshot |
 | `text` | free text | anything else, e.g. “讲义第二部分” |
 
-Outline entries and textbook points take locators; child entries and points must lie inside their entry when positions can be compared.
+Outline entries and textbook points take locators; child entries and points must lie inside their entry when positions can be compared. `learn source outline <id> --json` gives each section's `anchor` and, for e-books and folders, its `chapter` value. When an anchor appears in several files of a folder, the command says so: use the `chapter` form it suggests.
+
+## Code
+
+- Teach through predictions: “who calls this function?”, “what breaks if this line goes?”. Then let the learner check by reading the code or running it.
+- Transfer evidence is the learner recognizing the same design in another module.
+- `textbook_points` about code must pin the commit: `{"kind": "file", "value": "src/raft.go#L120-180@<commit>"}` with the commit from `learn source list --json`.
 
 ## Video courses
 

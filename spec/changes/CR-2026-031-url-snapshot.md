@@ -1,7 +1,7 @@
 ---
 id: CR-2026-031
 title: "网址资料：导入时抓取快照"
-status: accepted
+status: implemented
 target_version: v0.1.9
 created: 2026-09-28
 ---
@@ -45,3 +45,5 @@ created: 2026-09-28
 ## 决策
 
 2026-09-28 接受，排入 v0.1.8；同日随版本拆分移至 v0.1.9。
+
+2026-09-28 实现：`internal/web`；`curriculum import <url>` 与 `source add <url>`，`--sitemap`、`--sitemap-url`、`--prefix`、`--max-pages`；robots.txt、页间至少 1 秒、500 页上限、User-Agent 由程序强制；需要 JavaScript 或非 HTML 的页面跳过并说明原因；连接失败时输出沙箱说明；`source refresh` 重新抓取，内容相同则不生成新版本。真实抓取 ddia.vonng.com 中文站 26 页，草稿目录含序言与第 1–14 章。

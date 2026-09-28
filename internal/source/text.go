@@ -1,7 +1,6 @@
 package source
 
 import (
-	"bufio"
 	"fmt"
 	"io/fs"
 	"os"
@@ -35,34 +34,25 @@ func Slug(title string) string {
 	return b.String()
 }
 
-type heading struct {
-	level int
-	title string
-	line  int // 0-based
+// readLines reads a file as lines.
+func readLines(path string) ([]string, error) {
+	data, err := readFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(strings.TrimSuffix(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n"), "\n"), nil
 }
 
-// readLines reads a file, reporting headings outside code fences.
-func readLines(path string) ([]string, []heading, error) {
-	fh, err := os.Open(path)
+// readFile reads a file, refusing very large ones.
+func readFile(path string) ([]byte, error) {
+	info, err := os.Stat(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	defer fh.Close()
-	var lines []string
-	var heads []heading
-	inFence := false
-	scanner := bufio.NewScanner(fh)
-	scanner.Buffer(make([]byte, 1024*1024), 16*1024*1024)
-	for scanner.Scan() {
-		line := strings.TrimSuffix(scanner.Text(), "\r")
-		if strings.HasPrefix(strings.TrimSpace(line), "```") {
-			inFence = !inFence
-		} else if m := headingLine.FindStringSubmatch(line); m != nil && !inFence {
-			heads = append(heads, heading{len(m[1]), m[2], len(lines)})
-		}
-		lines = append(lines, line)
+	if info.Size() > 64<<20 {
+		return nil, fmt.Errorf("%s is larger than 64 MB", filepath.Base(path))
 	}
-	return lines, heads, scanner.Err()
+	return os.ReadFile(path)
 }
 
 // naturalLess orders names so that numbers compare by value: ch2 < ch10.
@@ -94,20 +84,22 @@ func digitsPrefix(s string) string {
 	return s[:i]
 }
 
-// folderFiles lists files with the given extensions, in natural path order.
-func folderFiles(dir string, exts ...string) ([]string, error) {
+// folderFiles lists regular files in natural path order, skipping hidden
+// files and folders.
+func folderFiles(dir string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() && strings.HasPrefix(d.Name(), ".") && p != dir {
-			return filepath.SkipDir
-		}
-		for _, e := range exts {
-			if !d.IsDir() && extOf(p) == e {
-				files = append(files, p)
+		if strings.HasPrefix(d.Name(), ".") && p != dir {
+			if d.IsDir() {
+				return filepath.SkipDir
 			}
+			return nil
+		}
+		if d.Type().IsRegular() {
+			files = append(files, p)
 		}
 		return nil
 	})
@@ -126,7 +118,7 @@ func readLineRange(path string, loc locator.Locator) (Content, error) {
 	if err != nil {
 		return Content{}, err
 	}
-	lines, _, err := readLines(target)
+	lines, err := readLines(target)
 	if err != nil {
 		return Content{}, err
 	}
@@ -179,21 +171,27 @@ func resolveFile(path, rel string) (string, error) {
 	return target, nil
 }
 
-type textAdapter struct{}
-
-func (textAdapter) Kind() string { return "text" }
-func (textAdapter) Detect(path string, info fs.FileInfo) bool {
-	return !info.IsDir() && extOf(path) == ".txt"
+func parseText(name string, data []byte) ([]doc, error) {
+	return []doc{{name: name, lines: strings.Split(string(data), "\n")}}, nil
 }
+
+// textAdapter is plain text: readable by line range, no structure. In a
+// folder it takes part as a document without headings.
+type textAdapter struct{ docAdapter }
+
+func newText() textAdapter {
+	return textAdapter{docAdapter{kind: "text", exts: []string{".txt"}, load: fileDocs(parseText), lineFiles: true}}
+}
+
 func (textAdapter) Capabilities() Caps                { return Caps{Extractable: true} }
 func (textAdapter) Outline(string) ([]Section, error) { return nil, ErrNoStructure }
-func (textAdapter) Read(path string, loc locator.Locator) (Content, error) {
+func (t textAdapter) Read(path string, loc locator.Locator) (Content, error) {
 	if err := requireKinds("text", loc, "file"); err != nil {
 		return Content{}, err
 	}
 	return readLineRange(path, loc)
 }
-func (a textAdapter) Validate(path string, loc locator.Locator) error {
+func (t textAdapter) Validate(path string, loc locator.Locator) error {
 	if err := requireKinds("text", loc, "file"); err != nil {
 		return err
 	}

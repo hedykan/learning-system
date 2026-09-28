@@ -27,8 +27,28 @@ var Kinds = []string{"page", "anchor", "chapter", "file", "time", "text"}
 var (
 	pagePattern = regexp.MustCompile(`^(\d+)(?:-(\d+))?$`)
 	timePattern = regexp.MustCompile(`^(?:(\d+)/)?(\d{1,2}(?::\d{2}){1,2})(?:-(\d{1,2}(?::\d{2}){1,2}))?$`)
-	filePattern = regexp.MustCompile(`^([^#]+?)(?:#L(\d+)(?:-(\d+))?)?$`)
+	filePattern = regexp.MustCompile(`^([^#@]+?)(?:#L(\d+)(?:-(\d+))?)?(?:@([0-9a-fA-F]{7,40}))?$`)
 )
+
+// Commit returns the commit a file locator is pinned to, if any
+// (`src/raft.go#L120-180@a1b2c3d`, CR-2026-030).
+func (l Locator) Commit() string {
+	if l.Kind != "file" {
+		return ""
+	}
+	if m := filePattern.FindStringSubmatch(l.Value); m != nil {
+		return m[4]
+	}
+	return ""
+}
+
+// Pin returns the file locator pinned to commit unless it already is.
+func (l Locator) Pin(commit string) Locator {
+	if l.Kind == "file" && l.Commit() == "" && commit != "" {
+		l.Value += "@" + commit
+	}
+	return l
+}
 
 // FromPages converts legacy [start, end] pages.
 func FromPages(pages []int) Locator {
@@ -127,10 +147,14 @@ func (l Locator) Label(lang string) string {
 		if !ok {
 			break
 		}
-		if a == 0 && b == maxLine {
-			return "`" + path + "`"
+		pin := ""
+		if c := l.Commit(); c != "" {
+			pin = " @" + c[:min(7, len(c))]
 		}
-		return i18n.F(lang, "`%s` 第 %s 行", path, fmt.Sprintf("%d–%d", a, b))
+		if a == 0 && b == maxLine {
+			return "`" + path + "`" + pin
+		}
+		return i18n.F(lang, "`%s` 第 %s 行", path, fmt.Sprintf("%d–%d", a, b)) + pin
 	}
 	return l.Value
 }

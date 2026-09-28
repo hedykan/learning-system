@@ -18,12 +18,13 @@ func (a *App) sourceCommand(explicitVault *string) *cobra.Command {
 	cmd := &cobra.Command{Use: "source", Short: "Add, read and attach learning resources"}
 	cmd.AddCommand(a.sourceAddCommand(explicitVault), a.sourceListCommand(explicitVault), a.sourceOutlineCommand(explicitVault),
 		a.sourceReadCommand(explicitVault), a.sourceAttachCommand(explicitVault), a.sourceDetachCommand(explicitVault),
-		a.sourceCheckCommand(explicitVault))
+		a.sourceCheckCommand(explicitVault), a.sourceRefreshCommand(explicitVault))
 	return cmd
 }
 
 func (a *App) sourceAddCommand(explicitVault *string) *cobra.Command {
-	var id, title, url, note string
+	var id, title, url, note, kind, sitemap, prefix string
+	var maxPages int
 	var external, link, asJSON bool
 	cmd := &cobra.Command{
 		Use: "add <path> | --external --title <name>", Short: "Store a resource (file, folder, or material without a file)", Args: cobra.MaximumNArgs(1),
@@ -32,7 +33,7 @@ func (a *App) sourceAddCommand(explicitVault *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			opts := curriculum.ResourceOptions{ID: id, Title: title, External: external, URL: url, Note: note, Now: a.Now()}
+			opts := curriculum.ResourceOptions{ID: id, Title: title, External: external, URL: url, Note: note, Kind: kind, Sitemap: sitemap, Prefix: prefix, MaxPages: maxPages, Now: a.Now()}
 			if len(args) == 1 {
 				opts.Path = args[0]
 			} else if !external {
@@ -62,6 +63,8 @@ func (a *App) sourceAddCommand(explicitVault *string) *cobra.Command {
 	cmd.Flags().StringVar(&url, "url", "", "where the material is (e.g. a playlist)")
 	cmd.Flags().StringVar(&note, "note", "", "publication details")
 	cmd.Flags().BoolVar(&link, "link", false, "link to the file outside the Vault instead of copying it")
+	cmd.Flags().StringVar(&kind, "kind", "", "force a kind that is never detected: code (a Git project)")
+	addFetchFlags(cmd, &sitemap, &prefix, &maxPages)
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
 	_ = cmd.MarkFlagRequired("id")
 	return cmd
@@ -274,4 +277,53 @@ func optional(v string) []string {
 		return nil
 	}
 	return []string{v}
+}
+
+func (a *App) sourceRefreshCommand(explicitVault *string) *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use: "refresh <source>", Short: "Record a new revision of a code project or web snapshot", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveVault(*explicitVault)
+			if err != nil {
+				return err
+			}
+			res, err := curriculum.Refresh(root, args[0], a.Now())
+			if err != nil {
+				return err
+			}
+			if res.Changed {
+				if err := session.Refresh(root); err != nil {
+					return err
+				}
+			}
+			if asJSON {
+				return writeJSON(cmd.OutOrStdout(), res)
+			}
+			if !res.Changed {
+				fmt.Fprintf(cmd.OutOrStdout(), "%s is unchanged\n", args[0])
+				return nil
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "%s: new revision recorded; earlier records keep their pinned positions\n", args[0])
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	return cmd
+}
+
+// addFetchFlags adds the web snapshot options of a URL source. --sitemap
+// and --sitemap-url both fill sitemap ("auto" or a URL).
+func addFetchFlags(cmd *cobra.Command, sitemap, prefix *string, maxPages *int) {
+	auto := new(bool)
+	cmd.Flags().BoolVar(auto, "sitemap", false, "for a URL: snapshot every page listed in the site's sitemap")
+	cmd.Flags().StringVar(sitemap, "sitemap-url", "", "for a URL: snapshot every page listed in this sitemap")
+	cmd.PreRunE = func(*cobra.Command, []string) error {
+		if *auto && *sitemap == "" {
+			*sitemap = "auto"
+		}
+		return nil
+	}
+	cmd.Flags().StringVar(prefix, "prefix", "", "for a URL with --sitemap: only pages whose path starts with this")
+	cmd.Flags().IntVar(maxPages, "max-pages", 0, "for a URL with --sitemap: at most this many pages (never more than 500)")
 }

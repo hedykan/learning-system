@@ -57,3 +57,20 @@ func TestWithin(t *testing.T) {
 		}
 	}
 }
+
+func TestCommitPins(t *testing.T) {
+	l := Locator{Kind: "file", Value: "src/raft.go#L120-180"}
+	if l.Commit() != "" || l.Pin("a1b2c3d4e5").Value != "src/raft.go#L120-180@a1b2c3d4e5" {
+		t.Fatalf("pin = %+v", l.Pin("a1b2c3d4e5"))
+	}
+	p := l.Pin("a1b2c3d4e5")
+	if p.Commit() != "a1b2c3d4e5" || p.Pin("ffffffff").Value != p.Value || p.Validate() != nil {
+		t.Fatal("pinned locator")
+	}
+	if got := p.Label("zh"); got != "`src/raft.go` 第 120–180 行 @a1b2c3d" {
+		t.Fatalf("label = %q", got)
+	}
+	if inside, ok := p.Within(Locator{Kind: "file", Value: "src/raft.go"}); !inside || !ok {
+		t.Fatal("pinned locator should compare by path and lines")
+	}
+}

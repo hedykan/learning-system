@@ -124,6 +124,22 @@ learn source check [curriculum] [--json]
 - `source check` 报告失效的定位，以及外部课程中没有任何资料位置的条目（`unsourced`）。
 - 文件夹资料按自然顺序读取（`ch2` 在 `ch10` 前）。
 
+## 更多资料（v0.1.9）
+
+```bash
+learn curriculum import <repo> --kind code --id <id> [--yes]
+learn curriculum import <url> --id <id> [--sitemap | --sitemap-url <url>] [--prefix <path>] [--max-pages <n>] [--yes]
+learn source add <repo> --kind code --id <id>
+learn source add <url> --id <id> [--sitemap | --sitemap-url <url>] [--prefix <path>] [--max-pages <n>]
+learn source refresh <source> [--json]
+```
+
+- 自动识别的格式：Markdown、文本、PDF、EPUB、HTML、DOCX、Jupyter、LaTeX、reStructuredText、AsciiDoc、Org，以及它们组成的文件夹。带 DRM 的 EPUB 在导入时拒绝。
+- 定位：EPUB 用 `chapter`（`text/ch2.xhtml#s2`）；文件夹与网页快照可用 `chapter`（`0010-ch6.html#6-复制`）区分重复锚点；代码用 `file`，可带 `@<提交>`。
+- 代码项目以链接方式导入，读取经 `git show`；依赖目录、构建目录、凭据类文件与二进制文件拒绝读取。挂载自动固定提交；代码类 `textbook_points` 必须带 `@<提交>`。
+- 网址快照存于 `Sources/<id>/original/snapshot-NNNN/`（每页一个 HTML 与 `pages.yaml`）。robots.txt、页间至少 1 秒、至多 500 页由程序强制；dry run 不联网。连接失败时报错并说明 Agent 沙箱的联网设置。
+- `source refresh`：代码项目记录新提交；网页重新抓取，内容相同则丢弃新快照。
+
 ## 三段流程与图谱（v0.1.8）
 
 - `next --json` 输出 `stage`：`consolidate`（复习到期、独立回忆）、`collect`（没有激活的课程、大纲未确认、全书学完）、`learn`（其余）。

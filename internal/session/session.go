@@ -444,6 +444,29 @@ func anchorConcepts(root, curriculumID string, rec *record.Record) error {
 	return nil
 }
 
+// checkPinnedCode requires textbook points about code to name the commit
+// they were read at: records never change, while the project moves on.
+func checkPinnedCode(root, curriculumID string, rec *record.Record) error {
+	for _, c := range rec.Concepts {
+		tp := c.TextbookPoints
+		if tp == nil || tp.Locator == nil || tp.Locator.Kind != "file" || tp.Locator.Commit() != "" {
+			continue
+		}
+		id := tp.Locator.Resource
+		if id == "" {
+			id = curriculumID
+		}
+		ref, err := curriculum.Resolve(root, id)
+		if err != nil {
+			return fmt.Errorf("concept %s textbook_points: %w", c.ID, err)
+		}
+		if ref.Kind == "code" {
+			return fmt.Errorf("concept %s textbook_points: pin the code position to a commit, e.g. %s", c.ID, tp.Locator.Pin(ref.Commit).Value)
+		}
+	}
+	return nil
+}
+
 // checkPointsInNode rejects textbook points that fall outside the concept's
 // outline entry when both positions can be compared (pages, time ranges of
 // the same episode, line ranges of the same file).
@@ -509,6 +532,9 @@ func submitAndRefresh(root, sessionID, kind string, rec *record.Record, now time
 		return CheckpointResult{}, err
 	}
 	if err := checkQuestionNodes(root, conv.Curriculum, rec); err != nil {
+		return CheckpointResult{}, err
+	}
+	if err := checkPinnedCode(root, conv.Curriculum, rec); err != nil {
 		return CheckpointResult{}, err
 	}
 	check := func(before, after *learner.Model) error { return stableGate(before, after, rec) }
