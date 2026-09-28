@@ -144,7 +144,7 @@ func TestPositionCompletionUncoveredAndNext(t *testing.T) {
 	if !ok || next.ID != "3" {
 		t.Fatalf("next = %+v %v", next, ok)
 	}
-	md, _ := os.ReadFile(filepath.Join(root, "Curriculum", "book", "progress.md"))
+	md, _ := os.ReadFile(filepath.Join(root, "Curriculum", "book", "学习进度.md"))
 	for _, want := range []string{"generated_by: learn", "↷ 已跳过 1 数据系统架构中的权衡", "✅ 已完成 2.3 可伸缩性", "旧记录：- 2026-09-25: completed session `s1`"} {
 		if !strings.Contains(string(md), want) {
 			t.Fatalf("progress.md missing %q:\n%s", want, md)
@@ -265,5 +265,57 @@ func TestOutlineCRLF(t *testing.T) {
 	}
 	if o, _ := curriculum.LoadOutline(root, "book"); len(o.Nodes) != 8 {
 		t.Fatalf("crlf outline nodes = %d", len(o.Nodes))
+	}
+}
+
+func TestAdvanceIfCurrent(t *testing.T) {
+	root, now := importBook(t, "plain text", "book.txt")
+	if _, err := curriculum.SetOutline(root, "book", []byte(ddiaOutline), false); err != nil {
+		t.Fatal(err)
+	}
+	o, _ := curriculum.ConfirmOutline(root, "book")
+	at := func(node string) {
+		pos, _ := curriculum.LoadPosition(root, "book")
+		pos, _ = curriculum.PositionAtNode(o, pos, node)
+		pos.Detour = nil
+		if err := curriculum.SavePosition(root, "book", pos); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mark := func(node string) *curriculum.Node {
+		t.Helper()
+		if _, err := curriculum.Mark(root, "book", node, "completed", "学完了", "", now); err != nil {
+			t.Fatal(err)
+		}
+		moved, err := curriculum.AdvanceIfCurrent(root, "book", node)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return moved
+	}
+	at("2.1")
+	if moved := mark("2.1"); moved == nil || moved.ID != "2.2" {
+		t.Fatalf("current entry should advance to 2.2, got %+v", moved)
+	}
+	if moved := mark("1.1"); moved != nil {
+		t.Fatalf("marking another entry moved the position to %+v", moved)
+	}
+	pos, _ := curriculum.LoadPosition(root, "book")
+	pos.Detour = &curriculum.Detour{Topic: "x", Reason: "y", ReturnCondition: "z"}
+	if err := curriculum.SavePosition(root, "book", pos); err != nil {
+		t.Fatal(err)
+	}
+	if moved := mark("2.2"); moved != nil {
+		t.Fatal("advanced during a detour")
+	}
+	at("3")
+	for _, n := range []string{"1", "1.2", "2", "2.3"} {
+		mark(n)
+	}
+	if moved := mark("3"); moved != nil {
+		t.Fatalf("the last entry should not move the position, got %+v", moved)
+	}
+	if pos, _ := curriculum.LoadPosition(root, "book"); pos.Node != "3" {
+		t.Fatalf("position = %s", pos.Node)
 	}
 }

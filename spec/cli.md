@@ -78,8 +78,12 @@ learn session abort --reason <reason> [--json]
 
 - 目录为 `nodes` 列表，条目含 `id`（如 `2.3`）、`title` 与可选 `pages: [start, end]`，按阅读顺序排列。`outline set` 校验 ID 唯一、父条目先出现、顺序递增、页码合法，结果为 `draft`；学习者确认后 `outline confirm` 置为 `confirmed`。Markdown Source 导入时自动生成草稿目录。
 - 目录确认后，`position set` 必须用 `--node`，章节与小节标题由目录填充；自由文本的 `--chapter`、`--section` 被拒绝。`--concept` 仍可自由填写。
-- `complete`、`skip` 向 `progress.yaml` 追加记录，baseline 期间拒绝。`progress.md` 与教材首页由 Runtime 生成，显示每个条目的已完成、已跳过、进行中、未覆盖或未开始。
+- `complete`、`skip` 向 `progress.yaml` 追加记录，baseline 期间拒绝。`学习进度.md` 与以书名命名的教材首页由 Runtime 生成，显示每个条目的已完成、已跳过、进行中、未覆盖或未开始。
 - `status --json` 新增 `outline`、`position_verified`、`uncovered` 与 `git_last_commit`。
+
+### 自动推进（v0.1.6）
+
+`complete` 或 `skip` 标记的正是当前位置、且不在 Detour 中时，位置自动移到下一个未完成条目，输出与 JSON 的 `moved_to` 报告新位置；全书最后一节完成时位置不变（CR-2026-017）。
 
 ### 状态与首页（v0.1.4）
 

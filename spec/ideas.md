@@ -26,6 +26,12 @@
 | IDEA-020 | 扫描版教材：先用模型视觉，读不出再请学习者换用文字版 | implemented | v0.1.5（见 CR-2026-014） |
 | IDEA-021 | Windows 构建与路径兼容测试 | implemented | v0.1.5（见 CR-2026-015） |
 | IDEA-022 | 跨课程学习模式实测：用第二本教材验证 Learning Pattern | idea | 有第二本教材后 |
+| IDEA-023 | 17 个核心验证场景全部通过 | partial | v0.1.6 复验后仅场景 7 未通过 |
+| IDEA-025 | 界面语言设置：固定文字跟随学习者语言 | accepted | v0.1.7（见 CR-2026-023） |
+| IDEA-026 | 学习记录未提交到 Git 时提醒 | accepted | v0.1.7（见 CR-2026-024） |
+| IDEA-027 | 教材要点兜底：学完一节时提示补上本节概念的教材要点 | idea | v0.1.7 候选 |
+| IDEA-028 | 教材文件夹整理：去掉与教材首页重复的 book.md，隐藏运行时状态文件 | idea | v0.1.7 候选 |
+| IDEA-024 | 自发检索提示：记录中出现对早先 Session 已学概念的使用、却没有 retrieval 事件时，checkpoint 输出提示 Agent 核对是否为自发检索 | idea | 下一版本候选 |
 
 ## IDEA-007 初步边界
 

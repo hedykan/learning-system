@@ -117,6 +117,23 @@ type ReviewResult struct {
 	Evidence   []Evidence `json:"evidence"`
 }
 
+// Question is a learner-generated key question, a first-class learning
+// object (CR-2026-020). IDs are global kebab-case slugs, like concepts.
+type Question struct {
+	ID       string     `json:"id"`
+	Question string     `json:"question"`
+	Concept  string     `json:"concept,omitempty"`
+	Node     string     `json:"node,omitempty"`
+	Evidence []Evidence `json:"evidence"`
+}
+
+// QuestionResolution closes an open question with learner evidence.
+type QuestionResolution struct {
+	Question string     `json:"question"`
+	Summary  string     `json:"summary"`
+	Evidence []Evidence `json:"evidence"`
+}
+
 type Retraction struct {
 	Ref    string `json:"ref"`
 	Reason string `json:"reason"`
@@ -138,6 +155,8 @@ type Record struct {
 	PatternObservations []PatternObservation `json:"pattern_observations,omitempty"`
 	ReviewResults       []ReviewResult       `json:"review_results,omitempty"`
 	NoRelated           []string             `json:"no_related,omitempty"`
+	Questions           []Question           `json:"questions,omitempty"`
+	QuestionResolutions []QuestionResolution `json:"question_resolutions,omitempty"`
 	Retractions         []Retraction         `json:"retractions,omitempty"`
 	ProgressDecision    *ProgressDecision    `json:"progress_decision,omitempty"`
 }
@@ -178,7 +197,7 @@ func (r *Record) Empty() bool {
 		}
 	}
 	return len(r.Events)+len(r.CognitiveChanges)+len(r.StateUpdates)+len(r.StrategyAttempts)+
-		len(r.PatternObservations)+len(r.ReviewResults)+len(r.NoRelated)+len(r.Retractions) == 0 && r.ProgressDecision == nil
+		len(r.PatternObservations)+len(r.ReviewResults)+len(r.NoRelated)+len(r.Questions)+len(r.QuestionResolutions)+len(r.Retractions) == 0 && r.ProgressDecision == nil
 }
 
 // Hash returns the canonical content hash of a record.

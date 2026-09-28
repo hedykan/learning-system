@@ -124,6 +124,9 @@ func TestUpdateAgentAssetsDryRunThenBacksUp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !strings.Contains(string(rules), "One learning turn has exactly one reply") {
+		t.Fatalf("updated rules lack the single-reply rule:\n%s", rules)
+	}
 	if !strings.Contains(string(rules), "## Learner-facing voice") {
 		t.Fatalf("updated rules lack learner-facing voice:\n%s", rules)
 	}

@@ -89,9 +89,13 @@ func Submit(root, sessionID, kind string, rec *record.Record, now time.Time) (Su
 	return SubmitChecked(root, sessionID, kind, rec, now, nil)
 }
 
-// SubmitChecked is Submit with an extra check on the candidate model; the
-// record is written only when the check passes.
-func SubmitChecked(root, sessionID, kind string, rec *record.Record, now time.Time, check func(*Model) error) (SubmitResult, error) {
+// Check inspects a submission. before is the model without the new record
+// (nil when an identical record already exists); after includes it.
+type Check func(before, after *Model) error
+
+// SubmitChecked is Submit with extra checks on the candidate model; the
+// record is written only when every check passes.
+func SubmitChecked(root, sessionID, kind string, rec *record.Record, now time.Time, check Check) (SubmitResult, error) {
 	resolver := NewResolver(root)
 	conv, err := resolver.Conversation(sessionID)
 	if err != nil {
@@ -119,7 +123,7 @@ func SubmitChecked(root, sessionID, kind string, rec *record.Record, now time.Ti
 				return SubmitResult{}, err
 			}
 			if check != nil {
-				if err := check(m); err != nil {
+				if err := check(nil, m); err != nil {
 					return SubmitResult{}, err
 				}
 			}
@@ -136,7 +140,11 @@ func SubmitChecked(root, sessionID, kind string, rec *record.Record, now time.Ti
 		return SubmitResult{}, err
 	}
 	if check != nil {
-		if err := check(m); err != nil {
+		before, err := Replay(envs, resolver)
+		if err != nil {
+			return SubmitResult{}, err
+		}
+		if err := check(before, m); err != nil {
 			return SubmitResult{}, err
 		}
 	}

@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.6 — 2026-09-28
+
+- 新增 [核心验证场景](spec/validation-scenarios.md)：17 个场景作为每个版本发布前的真实 Agent 验收标准。
+- 模型修订兜底：stable 概念出现误解或 partial、forgotten 复习时，记录必须同时降级，否则拒收；旧判断保留在历史中。
+- 完成当前所在小节时，位置自动推进到下一个未完成条目，修复绕行返回点错位与学完后位置停留在上一节的问题。
+- 学习模式在同一本教材 3 个 Session 支持时即可被采信。
+- 学习者关键问题成为一等学习对象：`questions` 与 `question_resolutions`，独立的 `Questions/<id>.md` 笔记，首页与总览列出开放问题，策略规则 R2b 在相关小节优先回答，`learn next` 输出 `open_questions`。
+- Skill 新增学习事件判别表（application、transfer、learner_proposed_method、insight、retrieval、connection）与稳定概念降级规则。
+- 话术：一个学习轮次只回复一次，对学习者的评价只出现在最后的回复中，进度提示最多一句不带评价的中性过渡。
+- 笔记以学习者的语言命名：`Concepts/<概念名称>.md`、`Questions/<问题>.md`、`Profile/学习者总览.md`、`Curriculum/<id>/<书名>.md`、`学习进度.md`；Session 标题与小标题改为中文；重建时自动迁移旧命名笔记并保留手写区。
+- README 改写为面向学习者的产品介绍，并补充 Obsidian 使用说明。
+
 ## v0.1.5 — 2026-09-26
 
 - 艾宾浩斯式间隔复习：按 1、2、4、7、15、30、60 天排期；Agent 提交 `review_results`；新增 `learn review` 与策略规则 R3b；首页显示“今天该复习”，概念笔记显示复习计划，学习者总览显示复习日程。

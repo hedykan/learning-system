@@ -68,7 +68,7 @@ func TestCheckpointEndAndRebuild(t *testing.T) {
 	if _, err := session.Checkpoint(root, &bad, now.Add(5*time.Minute)); err == nil {
 		t.Fatal("assistant evidence accepted")
 	}
-	if _, err := os.Stat(filepath.Join(root, "Concepts", "tail-latency.md")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "Concepts", "尾延迟.md")); !os.IsNotExist(err) {
 		t.Fatal("rejected record produced a projection")
 	}
 
@@ -83,7 +83,7 @@ func TestCheckpointEndAndRebuild(t *testing.T) {
 	if err != nil || again.Status != "unchanged" {
 		t.Fatalf("resubmit = %+v err=%v", again, err)
 	}
-	conceptPath := filepath.Join(root, "Concepts", "tail-latency.md")
+	conceptPath := filepath.Join(root, "Concepts", "尾延迟.md")
 	concept := read(t, conceptPath)
 	for _, want := range []string{"形成中", "「不能只看平均值」", "#^t0004", "平均延迟低即好 → 触发：慢请求的绝对数量 → 要同时看尾部延迟", "分片扇出时尾延迟如何放大"} {
 		if !strings.Contains(concept, want) {
@@ -93,7 +93,7 @@ func TestCheckpointEndAndRebuild(t *testing.T) {
 	if !strings.Contains(read(t, filepath.Join(root, "Sessions", started.ID+".md")), "learn:analysis:begin") {
 		t.Fatal("active session has no analysis block")
 	}
-	overview := read(t, filepath.Join(root, "Profile", "learner-state.md"))
+	overview := read(t, filepath.Join(root, "Profile", "学习者总览.md"))
 	if !strings.Contains(overview, "application_probe") {
 		t.Fatalf("overview lacks next action:\n%s", overview)
 	}
@@ -115,7 +115,7 @@ func TestCheckpointEndAndRebuild(t *testing.T) {
 			t.Fatalf("session doc missing %q:\n%s", want, sessionDoc)
 		}
 	}
-	if strings.Contains(sessionDoc, "## Learning Events") {
+	if strings.Contains(sessionDoc, "\n## 学习事件") {
 		t.Fatal("legacy analysis rendered despite records")
 	}
 	pos, err := curriculum.LoadPosition(root, "ddia")
@@ -124,16 +124,16 @@ func TestCheckpointEndAndRebuild(t *testing.T) {
 	}
 
 	before := map[string]string{}
-	for _, rel := range []string{"Concepts/tail-latency.md", "Profile/learner-state.md", "Curriculum/ddia/index.md"} {
+	for _, rel := range []string{"Concepts/尾延迟.md", "Profile/学习者总览.md", "Curriculum/ddia/DDIA.md"} {
 		before[rel] = read(t, filepath.Join(root, rel))
 	}
-	if !strings.Contains(before["Concepts/tail-latency.md"], "我的比喻") {
+	if !strings.Contains(before["Concepts/尾延迟.md"], "我的比喻") {
 		t.Fatal("user note lost on session end")
 	}
-	if err := os.Remove(filepath.Join(root, "Profile", "learner-state.md")); err != nil {
+	if err := os.Remove(filepath.Join(root, "Profile", "学习者总览.md")); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Remove(filepath.Join(root, "Curriculum", "ddia", "index.md")); err != nil {
+	if err := os.Remove(filepath.Join(root, "Curriculum", "ddia", "DDIA.md")); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.RemoveAll(filepath.Join(root, ".learning", "model")); err != nil {
@@ -156,6 +156,38 @@ func TestCheckpointEndAndRebuild(t *testing.T) {
 	}
 	if len(envs) != 2 || projection.Staleness(root, m.Generation) != "current" {
 		t.Fatalf("envs=%d staleness=%s", len(envs), projection.Staleness(root, m.Generation))
+	}
+
+	// Notes named by internal IDs (early v0.1.6) migrate to learner-language
+	// names, carrying the user block; files the learner wrote are untouched.
+	named := filepath.Join(root, "Concepts", "尾延迟.md")
+	legacy := filepath.Join(root, "Concepts", "tail-latency.md")
+	if err := os.Rename(named, legacy); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(root, "Profile", "学习者总览.md"), filepath.Join(root, "Profile", "learner-state.md")); err != nil {
+		t.Fatal(err)
+	}
+	mine := filepath.Join(root, "Concepts", "我的随笔.md")
+	if err := os.WriteFile(mine, []byte("自己写的笔记"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := session.Refresh(root); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, named); !strings.Contains(got, "我的比喻：尾延迟像排队最慢的那个人") || !strings.Contains(got, "  - \"tail-latency\"") {
+		t.Fatalf("migrated note lost the user block or id alias:\n%s", got)
+	}
+	for _, gone := range []string{legacy, filepath.Join(root, "Profile", "learner-state.md")} {
+		if _, err := os.Stat(gone); !os.IsNotExist(err) {
+			t.Fatalf("legacy file kept: %s", gone)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "Profile", "学习者总览.md")); err != nil {
+		t.Fatal("overview not regenerated under its new name")
+	}
+	if got := read(t, mine); got != "自己写的笔记" {
+		t.Fatalf("learner-authored note changed: %q", got)
 	}
 }
 

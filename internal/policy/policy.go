@@ -37,6 +37,16 @@ type Action struct {
 	Reason             string   `json:"reason"`
 	Evidence           []string `json:"evidence"`
 	HistoryUsed        bool     `json:"history_used"`
+	// OpenQuestions lists up to three open learner questions (CR-2026-020).
+	OpenQuestions []QuestionRef `json:"open_questions,omitempty"`
+}
+
+// QuestionRef is an open learner question shown with every recommendation.
+type QuestionRef struct {
+	ID       string `json:"id"`
+	Question string `json:"question"`
+	Concept  string `json:"concept,omitempty"`
+	Node     string `json:"node,omitempty"`
 }
 
 // Defaults is the strategy used when no history applies.
@@ -58,6 +68,12 @@ func Next(m *learner.Model, ctx Context) Action {
 	}
 	if act.Evidence == nil {
 		act.Evidence = []string{}
+	}
+	for _, q := range m.OpenQuestions(ctx.Curriculum) {
+		if len(act.OpenQuestions) == 3 {
+			break
+		}
+		act.OpenQuestions = append(act.OpenQuestions, QuestionRef{ID: q.ID, Question: q.Question, Concept: q.Concept, Node: q.Node})
 	}
 	for _, gid := range act.Evidence {
 		if session, _, _ := strings.Cut(gid, ":"); session != ctx.ActiveSession {
@@ -98,6 +114,19 @@ func decide(m *learner.Model, ctx Context) Action {
 			return Action{Action: "repair_misconception", Concept: c.ID, Situation: "misconception", CurriculumRelation: relation,
 				Rule: "R2-open-misconception", Reason: fmt.Sprintf("「%s」有尚未修正的误解：%s", c.Label, latest.Summary),
 				Evidence: []string{latest.GID}}
+		}
+	}
+	if ctx.Position.Detour == nil {
+		current := currentConcept(m, ctx)
+		for _, q := range m.OpenQuestions(ctx.Curriculum) {
+			onNode := q.Node != "" && q.Node == ctx.Position.Node
+			onConcept := q.Concept != "" && current != nil && current.ID == q.Concept
+			if !onNode && !onConcept {
+				continue
+			}
+			return Action{Action: "address_question", Concept: q.Concept, Situation: "new_concept", CurriculumRelation: relation,
+				Rule: "R2b-open-question", Reason: fmt.Sprintf("学习者之前提出的问题在这里可以回答：%s", q.Question),
+				Evidence: []string{q.Session + ":" + q.ID}}
 		}
 	}
 	for _, c := range scope {

@@ -151,42 +151,40 @@ type File struct {
 // Plan renders every projection and compares it with the disk.
 func Plan(root string, in Inputs) ([]File, error) {
 	rendered := map[string]string{}
-	owned := func(rel string, body string) error {
+	orphans := findOrphans(root, in)
+	owned := func(rel string, body string) {
 		existing, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
 		keep := mdblock.PreservedUser(string(existing), strings.Contains(string(existing), "generated_by: learn"))
+		if strings.TrimSpace(keep) == "" {
+			keep = orphans.userBlocks[rel]
+		}
 		rendered[rel] = body + "\n" + mdblock.UserSection(keep)
-		return nil
 	}
-	if err := owned("README.md", renderHome(in)); err != nil {
-		return nil, err
-	}
+	owned("README.md", renderHome(in))
 	for id := range in.Titles {
 		if in.Archived[id] {
 			continue
 		}
-		if err := owned("Curriculum/"+id+"/index.md", renderCurriculum(in, id)); err != nil {
-			return nil, err
-		}
+		owned(CurriculumIndexFile(id, in.Titles[id]), renderCurriculum(in, id))
 		progress, err := curriculum.ProgressMarkdown(root, id, in.Model.NodesWithEvidence(id))
 		if err != nil {
 			return nil, err
 		}
-		rendered["Curriculum/"+id+"/progress.md"] = progress
+		rendered[CurriculumProgressFile(id)] = progress
 	}
 	if !in.Model.Empty() {
 		for _, c := range in.Model.ConceptList() {
-			if err := owned("Concepts/"+c.ID+".md", renderConcept(in, c)); err != nil {
-				return nil, err
-			}
+			owned(ConceptFile(in.Model, c.ID), renderConcept(in, c))
 		}
-		if err := owned("Profile/learner-state.md", renderOverview(in)); err != nil {
-			return nil, err
+		owned(OverviewFile, renderOverview(in))
+		for _, q := range in.Model.QuestionList() {
+			owned(QuestionFile(in.Model, q.ID), renderQuestion(in, q))
 		}
 	}
 	for id := range in.Model.Sessions {
 		rel := "Sessions/" + id + ".md"
 		existing, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
-		header := fmt.Sprintf("---\nid: %s\ngenerated_by: learn\n---\n\n# %s\n", id, sessionLabel(id))
+		header := fmt.Sprintf("---\nid: %s\ngenerated_by: learn\n---\n\n# 学习记录 %s\n", id, sessionLabel(id))
 		rendered[rel] = mdblock.Upsert(string(existing), "analysis", renderSessionAnalysis(in, id), header)
 	}
 	paths := make([]string, 0, len(rendered))
@@ -194,7 +192,7 @@ func Plan(root string, in Inputs) ([]File, error) {
 		paths = append(paths, p)
 	}
 	sort.Strings(paths)
-	files := make([]File, 0, len(paths))
+	files := make([]File, 0, len(paths)+len(orphans.remove))
 	for _, rel := range paths {
 		f := File{Path: rel, content: rendered[rel], Action: "create"}
 		if existing, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))); err == nil {
@@ -205,13 +203,119 @@ func Plan(root string, in Inputs) ([]File, error) {
 		}
 		files = append(files, f)
 	}
+	for _, rel := range orphans.remove {
+		if _, kept := rendered[rel]; !kept {
+			files = append(files, File{Path: rel, Action: "remove"})
+		}
+	}
 	return files, nil
+}
+
+type orphanSet struct {
+	userBlocks map[string]string // expected path -> user block carried over
+	remove     []string
+}
+
+// findOrphans locates generated notes whose file name no longer matches the
+// naming rules (for example v0.1.6 notes named by internal IDs). Their user
+// blocks move to the expected file; only files marked generated_by: learn
+// are ever removed.
+func findOrphans(root string, in Inputs) orphanSet {
+	o := orphanSet{userBlocks: map[string]string{}}
+	adopt := func(rel, expected string) {
+		if rel == expected || expected == "" {
+			return
+		}
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		if err != nil || !strings.Contains(string(data), "generated_by: learn") {
+			return
+		}
+		if block, ok := mdblock.Extract(string(data), "user"); ok && strings.TrimSpace(block) != "" && o.userBlocks[expected] == "" {
+			o.userBlocks[expected] = block
+		}
+		o.remove = append(o.remove, rel)
+	}
+	frontValue := func(data, key string) string {
+		if !strings.HasPrefix(data, "---\n") {
+			return ""
+		}
+		rest := data[len("---\n"):]
+		end := strings.Index(rest, "\n---\n")
+		if end < 0 {
+			return ""
+		}
+		for _, line := range strings.Split(rest[:end], "\n") {
+			if strings.HasPrefix(line, key+": ") {
+				return strings.TrimSpace(strings.TrimPrefix(line, key+": "))
+			}
+		}
+		return ""
+	}
+	scan := func(dir string, expected func(data string) string) {
+		entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(dir)))
+		if err != nil {
+			return
+		}
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
+				continue
+			}
+			rel := dir + "/" + e.Name()
+			data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+			if err != nil {
+				continue
+			}
+			adopt(rel, expected(string(data)))
+		}
+	}
+	m := in.Model
+	scan("Concepts", func(d string) string {
+		if id := frontValue(d, "concept"); m.Concepts[id] != nil {
+			return ConceptFile(m, id)
+		}
+		return ""
+	})
+	scan("Questions", func(d string) string {
+		if id := frontValue(d, "question"); m.Questions[id] != nil {
+			return QuestionFile(m, id)
+		}
+		return ""
+	})
+	scan("Profile", func(d string) string {
+		if frontValue(d, "projection") == "learner-overview" {
+			return OverviewFile
+		}
+		return ""
+	})
+	for id := range in.Titles {
+		if in.Archived[id] {
+			continue
+		}
+		dir := "Curriculum/" + id
+		scan(dir, func(d string) string {
+			switch {
+			case frontValue(d, "projection") == "curriculum-index":
+				return CurriculumIndexFile(id, in.Titles[id])
+			case strings.Contains(d, "# 学习进度 — "):
+				return CurriculumProgressFile(id)
+			}
+			return ""
+		})
+	}
+	sort.Strings(o.remove)
+	return o
 }
 
 // Write applies a plan, skipping unchanged files.
 func Write(root string, files []File) error {
 	for _, f := range files {
 		if f.Action == "unchanged" {
+			continue
+		}
+		if f.Action == "remove" {
+			if err := os.Remove(filepath.Join(root, filepath.FromSlash(f.Path))); err != nil && !os.IsNotExist(err) {
+				return err
+			}
 			continue
 		}
 		if err := fsutil.WriteFileAtomic(filepath.Join(root, filepath.FromSlash(f.Path)), []byte(f.content), 0o644); err != nil {
@@ -268,7 +372,10 @@ func recentSessions(root string, limit int) ([]RecentSession, error) {
 
 // Staleness compares the overview's generation with the current records.
 func Staleness(root, generation string) string {
-	data, err := os.ReadFile(filepath.Join(root, "Profile", "learner-state.md"))
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(OverviewFile)))
+	if err != nil {
+		data, err = os.ReadFile(filepath.Join(root, filepath.FromSlash(legacyOverviewFile)))
+	}
 	if err != nil {
 		if generation == "empty" {
 			return "none"

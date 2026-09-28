@@ -26,7 +26,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.1.5"
+const Version = "0.1.6"
 
 type App struct {
 	Out      io.Writer
@@ -946,7 +946,7 @@ func (a *App) stateCommand(explicitVault *string) *cobra.Command {
 				return nil
 			}
 			if !asJSON {
-				data, err := os.ReadFile(filepath.Join(root, "Profile", "learner-state.md"))
+				data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(projection.OverviewFile)))
 				if err == nil {
 					_, err = cmd.OutOrStdout().Write(data)
 					return err
@@ -1024,7 +1024,7 @@ func (a *App) stateConceptCommand(explicitVault *string) *cobra.Command {
 				return fmt.Errorf("unknown concept %q", args[0])
 			}
 			if !asJSON {
-				data, err := os.ReadFile(filepath.Join(root, "Concepts", c.ID+".md"))
+				data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(projection.ConceptFile(m, c.ID))))
 				if err == nil {
 					_, err = cmd.OutOrStdout().Write(data)
 					return err
@@ -1174,6 +1174,10 @@ func (a *App) curriculumMarkCommand(explicitVault *string, use, kind, short stri
 			if err != nil {
 				return err
 			}
+			moved, err := curriculum.AdvanceIfCurrent(root, id, entry.Node)
+			if err != nil {
+				return err
+			}
 			if err := session.Refresh(root); err != nil {
 				return err
 			}
@@ -1182,10 +1186,13 @@ func (a *App) curriculumMarkCommand(explicitVault *string, use, kind, short stri
 				return err
 			}
 			if asJSON {
-				return writeJSON(cmd.OutOrStdout(), map[string]any{"entry": entry, "next_node": next})
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"entry": entry, "moved_to": moved, "next_node": next})
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Marked %s %s: %s\n", kind, entry.Node, entry.Title)
-			if next != nil {
+			switch {
+			case moved != nil:
+				fmt.Fprintf(cmd.OutOrStdout(), "Position moved to %s\n", moved.Label())
+			case next != nil:
 				fmt.Fprintf(cmd.OutOrStdout(), "Next in the outline: %s (set it with 'learn curriculum position set --node %s')\n", next.Label(), next.ID)
 			}
 			return nil

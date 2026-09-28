@@ -84,6 +84,29 @@ type RelatedEntry struct {
 	Note    string `json:"note,omitempty"`
 }
 
+// QuestionItem is a learner-generated key question with its lifecycle.
+type QuestionItem struct {
+	ID         string          `json:"id"`
+	Question   string          `json:"question"`
+	Concept    string          `json:"concept,omitempty"`
+	Node       string          `json:"node,omitempty"`
+	Curriculum string          `json:"curriculum"`
+	Session    string          `json:"session"`
+	At         string          `json:"at"`
+	Order      int             `json:"order"`
+	Evidence   []EvidenceRef   `json:"evidence"`
+	Status     string          `json:"status"` // open, resolved
+	Resolution *QuestionAnswer `json:"resolution,omitempty"`
+}
+
+// QuestionAnswer records how and when a question was resolved.
+type QuestionAnswer struct {
+	Session  string        `json:"session"`
+	At       string        `json:"at"`
+	Summary  string        `json:"summary"`
+	Evidence []EvidenceRef `json:"evidence"`
+}
+
 // Review is one spaced-review outcome.
 type Review struct {
 	GID      string        `json:"id"`
@@ -187,16 +210,17 @@ type SessionInfo struct {
 
 // Model is the replayed Learner Model plus Cognitive History.
 type Model struct {
-	Generation  string                  `json:"generation"`
-	Sessions    map[string]*SessionInfo `json:"sessions"`
-	Concepts    map[string]*Concept     `json:"concepts"`
-	Events      []*Event                `json:"events"`
-	Changes     []*Change               `json:"cognitive_changes"`
-	Attempts    []*Attempt              `json:"strategy_attempts"`
-	Patterns    map[string]*Pattern     `json:"patterns"`
-	Progress    []*Progress             `json:"progress_decisions"`
-	Reviews     []*Review               `json:"reviews"`
-	Retractions []*Retraction           `json:"retractions"`
+	Generation  string                   `json:"generation"`
+	Sessions    map[string]*SessionInfo  `json:"sessions"`
+	Concepts    map[string]*Concept      `json:"concepts"`
+	Events      []*Event                 `json:"events"`
+	Changes     []*Change                `json:"cognitive_changes"`
+	Attempts    []*Attempt               `json:"strategy_attempts"`
+	Patterns    map[string]*Pattern      `json:"patterns"`
+	Progress    []*Progress              `json:"progress_decisions"`
+	Reviews     []*Review                `json:"reviews"`
+	Questions   map[string]*QuestionItem `json:"questions"`
+	Retractions []*Retraction            `json:"retractions"`
 
 	order    int
 	items    map[string]any
@@ -207,7 +231,8 @@ func New() *Model {
 	return &Model{
 		Sessions: map[string]*SessionInfo{}, Concepts: map[string]*Concept{}, Patterns: map[string]*Pattern{},
 		Events: []*Event{}, Changes: []*Change{}, Attempts: []*Attempt{}, Progress: []*Progress{}, Retractions: []*Retraction{}, Reviews: []*Review{},
-		items: map[string]any{}, itemJSON: map[string]string{},
+		Questions: map[string]*QuestionItem{},
+		items:     map[string]any{}, itemJSON: map[string]string{},
 	}
 }
 
@@ -317,11 +342,34 @@ func (p *Pattern) Status() string {
 	switch {
 	case contradicts > 0 && contradicts >= supports:
 		return "contested"
-	case len(sessions) >= 2 && len(curricula) >= 2 && supports > contradicts:
+	case supports > contradicts && ((len(sessions) >= 2 && len(curricula) >= 2) || len(sessions) >= 3):
+		// Two curricula across two sessions, or three sessions in one
+		// curriculum (CR-2026-018).
 		return "supported"
 	default:
 		return "candidate"
 	}
+}
+
+// QuestionList returns questions in the order they were asked.
+func (m *Model) QuestionList() []*QuestionItem {
+	out := make([]*QuestionItem, 0, len(m.Questions))
+	for _, q := range m.Questions {
+		out = append(out, q)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Order < out[j].Order })
+	return out
+}
+
+// OpenQuestions returns open questions of a curriculum ("" for all).
+func (m *Model) OpenQuestions(curriculum string) []*QuestionItem {
+	var out []*QuestionItem
+	for _, q := range m.QuestionList() {
+		if q.Status == "open" && (curriculum == "" || q.Curriculum == curriculum) {
+			out = append(out, q)
+		}
+	}
+	return out
 }
 
 // ConceptList returns concepts sorted by ID.

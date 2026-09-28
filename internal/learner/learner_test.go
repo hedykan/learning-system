@@ -239,6 +239,16 @@ func TestPatternNeedsTwoCurricula(t *testing.T) {
 	if got := m.Patterns["concrete-before-abstract"].Status(); got != "candidate" {
 		t.Fatalf("two sessions in one curriculum should stay candidate, got %s", got)
 	}
+	s3 := "session-20260909-100000.000000000"
+	threeSessions := fakeResolver{s1: convs[s1], s2: convs[s2], s3: convs[s2]}
+	third := obs("p3", "t0002", "取决于最慢的分片")
+	m3, err := learner.Replay([]record.Envelope{env(s1, 1, "checkpoint", revision()), env(s1, 2, "checkpoint", obs("p1", "t0004", "不能只看平均值")), env(s2, 1, "checkpoint", sameCurr), env(s3, 1, "checkpoint", third)}, threeSessions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m3.Patterns["concrete-before-abstract"].Status(); got != "supported" {
+		t.Fatalf("three sessions in one curriculum should be supported, got %s", got)
+	}
 	otherCurr := obs("p2", "t0002", "取决于最慢的分片")
 	otherCurr.Curriculum = "calculus"
 	m, err = replay(t, env(s1, 1, "checkpoint", revision()), env(s1, 2, "checkpoint", obs("p1", "t0004", "不能只看平均值")), env(s2, 1, "checkpoint", otherCurr))

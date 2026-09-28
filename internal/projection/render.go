@@ -52,7 +52,7 @@ func (in Inputs) quotes(list []learner.EvidenceRef) string {
 
 func conceptLink(m *learner.Model, id string) string {
 	if c, ok := m.Concepts[id]; ok {
-		return fmt.Sprintf("[[Concepts/%s|%s]]", id, c.Label)
+		return link(ConceptFile(m, id), c.Label)
 	}
 	return id
 }
@@ -68,11 +68,9 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 	var b strings.Builder
 	var extra strings.Builder
 	fmt.Fprintf(&extra, "concept: %s\nstate: %s\n", c.ID, c.State())
-	if len(c.Aliases) > 0 {
-		extra.WriteString("aliases:\n")
-		for _, a := range c.Aliases {
-			fmt.Fprintf(&extra, "  - %q\n", a)
-		}
+	extra.WriteString("aliases:\n")
+	for _, a := range append(append([]string{}, c.Aliases...), c.ID) {
+		fmt.Fprintf(&extra, "  - %q\n", a)
 	}
 	extra.WriteString("tags:\n")
 	fmt.Fprintf(&extra, "  - learning/state/%s\n", c.State())
@@ -100,7 +98,7 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 			fmt.Fprintf(&b, "- 教材来源：%s %s\n", in.Titles[r.Curriculum], loc)
 			continue
 		}
-		fmt.Fprintf(&b, "- 教材来源：[[Curriculum/%s/index|%s]] %s\n", r.Curriculum, in.Titles[r.Curriculum], loc)
+		fmt.Fprintf(&b, "- 教材来源：%s %s\n", link(CurriculumIndexFile(r.Curriculum, in.Titles[r.Curriculum]), in.Titles[r.Curriculum]), loc)
 	}
 
 	if n := len(c.Points); n > 0 {
@@ -231,6 +229,19 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 		b.WriteString("暂无。\n")
 	}
 
+	var asked []*learner.QuestionItem
+	for _, q := range m.QuestionList() {
+		if q.Concept == c.ID {
+			asked = append(asked, q)
+		}
+	}
+	if len(asked) > 0 {
+		b.WriteString("\n## 学习者提出的问题\n\n")
+		for _, q := range asked {
+			fmt.Fprintf(&b, "- %s（%s）\n", questionLink(m, q), questionStatus[q.Status])
+		}
+	}
+
 	b.WriteString("\n## 复习计划\n\n")
 	if s := m.ScheduleFor(c); s.Started {
 		fmt.Fprintf(&b, "- 下次复习：%s（第 %d 档，间隔 %d 天）\n- 已复习：%d 次\n", s.Due, s.Level+1, s.Interval, s.Reviews)
@@ -287,6 +298,36 @@ func mergeOverlapping(quotes []learner.EvidenceRef) []learner.EvidenceRef {
 		}
 	}
 	return out
+}
+
+var questionStatus = map[string]string{"open": "开放", "resolved": "已解决"}
+
+func questionLink(m *learner.Model, q *learner.QuestionItem) string {
+	return link(QuestionFile(m, q.ID), q.Question)
+}
+
+// renderQuestion renders one learner-generated key question as its own note.
+func renderQuestion(in Inputs, q *learner.QuestionItem) string {
+	m := in.Model
+	var b strings.Builder
+	extra := fmt.Sprintf("question: %s\nstatus: %s\naliases:\n  - %q\ntags:\n  - learning/question/%s\n  - learning/curriculum/%s\n", q.ID, q.Status, q.ID, q.Status, q.Curriculum)
+	b.WriteString(frontmatter("question", extra, m.Generation))
+	fmt.Fprintf(&b, "# %s\n\n%s", q.Question, notice)
+	fmt.Fprintf(&b, "- 状态：%s\n- 提出于：%s\n", questionStatus[q.Status], sessionLink(q.Session))
+	if q.Concept != "" {
+		fmt.Fprintf(&b, "- 相关概念：%s\n", conceptLink(m, q.Concept))
+	}
+	if q.Node != "" {
+		fmt.Fprintf(&b, "- 预计在目录条目 %s 回答\n", q.Node)
+	}
+	fmt.Fprintf(&b, "\n## 学习者原话\n\n%s\n", in.quotes(q.Evidence))
+	b.WriteString("\n## 解答\n\n")
+	if r := q.Resolution; r != nil {
+		fmt.Fprintf(&b, "%s\n\n- 解决于：%s\n- 证据：%s\n", r.Summary, sessionLink(r.Session), in.quotes(r.Evidence))
+	} else {
+		b.WriteString("尚未解决。学习位置到达相关小节或概念时，Agent 会先回来回答它。\n")
+	}
+	return b.String()
 }
 
 func cell(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, "|", "\\|"), "\n", " ") }
@@ -381,6 +422,15 @@ func renderOverview(in Inputs) string {
 		for _, k := range keys {
 			c := counts[k]
 			fmt.Fprintf(&b, "| %s | %s | %d | %d | %d |\n", k.strategy, k.situation, c[0], c[1], c[2])
+		}
+	}
+
+	b.WriteString("\n## 学习者提出的问题\n\n")
+	if qs := m.QuestionList(); len(qs) == 0 {
+		b.WriteString("暂无。\n")
+	} else {
+		for _, q := range qs {
+			fmt.Fprintf(&b, "- %s（%s）\n", questionLink(m, q), questionStatus[q.Status])
 		}
 	}
 

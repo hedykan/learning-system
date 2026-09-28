@@ -172,7 +172,7 @@ func TestAbortDoesNotAdvanceCurriculumProgress(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	progressPath := filepath.Join(root, "Curriculum", "book", "progress.md")
+	progressPath := filepath.Join(root, "Curriculum", "book", "学习进度.md")
 	before, err := os.ReadFile(progressPath)
 	if err != nil {
 		t.Fatal(err)

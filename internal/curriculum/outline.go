@@ -347,6 +347,40 @@ func Mark(root, id, node, kind, reason, session string, now time.Time) (Progress
 	return entry, appendProgress(root, id, entry)
 }
 
+// AdvanceIfCurrent moves the position to the next unfinished entry when the
+// entry just marked is the current position and no detour is open. It
+// returns the new node, or nil when the position did not move (CR-2026-017).
+func AdvanceIfCurrent(root, id, marked string) (*Node, error) {
+	pos, err := LoadPosition(root, id)
+	if err != nil {
+		return nil, err
+	}
+	if pos.Detour != nil || pos.Node != marked {
+		return nil, nil
+	}
+	o, err := LoadOutline(root, id)
+	if err != nil {
+		return nil, err
+	}
+	entries, err := LoadProgress(root, id)
+	if err != nil {
+		return nil, err
+	}
+	next, ok := NextNode(o, Statuses(o, entries, pos, nil), pos)
+	if !ok || next.ID == pos.Node {
+		return nil, nil
+	}
+	moved, err := PositionAtNode(o, pos, next.ID)
+	if err != nil {
+		return nil, err
+	}
+	moved.CurrentConcept = ""
+	if err := SavePosition(root, id, moved); err != nil {
+		return nil, err
+	}
+	return &next, RenderProgress(root, id)
+}
+
 // RecordSession logs a finished session at the current position.
 func RecordSession(root, id, session string, now time.Time) error {
 	pos, err := LoadPosition(root, id)
@@ -506,14 +540,17 @@ func NextNode(o Outline, statuses []NodeStatus, pos Position) (Node, bool) {
 // StatusLabel is the human label of each entry status.
 var StatusLabel = map[string]string{"completed": "✅ 已完成", "skipped": "↷ 已跳过", "in_progress": "▶ 进行中", "partial": "◐ 学过一部分", "uncovered": "⚠ 未覆盖", "not_started": "○ 未开始"}
 
-// RenderProgress regenerates progress.md using session evidence only; the
+// ProgressFile is the generated progress page inside a curriculum folder.
+const ProgressFile = "学习进度.md"
+
+// RenderProgress regenerates the progress page using session evidence only; the
 // full projection refresh re-renders it with concept evidence as well.
 func RenderProgress(root, id string) error {
 	content, err := ProgressMarkdown(root, id, nil)
 	if err != nil {
 		return err
 	}
-	return fsutil.WriteFileAtomic(filepath.Join(root, "Curriculum", id, "progress.md"), []byte(content), 0o644)
+	return fsutil.WriteFileAtomic(filepath.Join(root, "Curriculum", id, ProgressFile), []byte(content), 0o644)
 }
 
 // ProgressMarkdown renders progress.md; touched adds entries with evidence.

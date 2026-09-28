@@ -12,7 +12,7 @@
 Conversations/<session>.md                      Raw，append-only，事实
 .learning/interpretations/<session>/NNNN.json   Interpretation Record，append-only，Git 跟踪
 .learning/model/learner-model.json              派生缓存，可删除重建，Git 忽略
-Concepts/ Sessions/ Profile/ Curriculum/<id>/index.md   Markdown 投影，可重建，Git 跟踪
+Concepts/ Questions/ Sessions/ Profile/ Curriculum/<id>/<书名>.md   Markdown 投影，可重建，Git 跟踪；文件名使用学习者语言（CR-2026-022）
 Curriculum/<id>/detours.yaml                    Curriculum State 的 Detour 日志，append-only
 ```
 
@@ -116,6 +116,9 @@ Agent 通过 `session checkpoint`、`session end` 或 `session annotate` 提交�
 - `id` 为全局 kebab-case slug，跨 Curriculum 共享；首次出现必须在 `concepts` 声明 `label`。
 - 新声明的 `label` 或 `aliases` 与其他已有 Concept 的 label/alias 大小写不敏感重名时拒绝，要求复用已有 ID，防止重复概念。
 - 已存在 Concept 可再次声明以追加 alias 或 `source_ref`，不能修改 label。
+- v0.1.6：记录可带 `questions`（全局 kebab-case ID、4–120 字、可选已有 `concept` 与已确认目录中的 `node`、必须有学习者原话）与 `question_resolutions`（每个问题只能解决一次）。`learn next` 输出最多 3 个 `open_questions`（CR-2026-020）。
+- v0.1.6：提交时（不含回放），若一个应用前为 `stable` 的 Concept 在本记录中出现 `misconception` 事件或 `partial`、`forgotten` 复习结果，且应用后仍为 `stable`，记录被拒收（CR-2026-016）。
+- v0.1.6：Learning Pattern 在支持多于反例，且“两本教材、至少两个 Session”或“至少三个 Session”支持时为 `supported`（CR-2026-018）。
 - v0.1.5：Concept 可带 `related`（无向关系，说明最多 40 字，不能指向自身）；记录可带 `review_results`（`recalled`、`partial`、`forgotten`，出题轮次为助手轮次，证据在其后）。排期由记录推导：间隔 1、2、4、7、15、30、60 天，首次 developing 或 stable 进入第 0 档，想起升档、部分想起保持、忘记或变为 fragile 回到第 0 档（CR-2026-012、CR-2026-013）。
 - v0.1.4：Concept 可带 `textbook_points`（`pages: [start, end]`，1–5 条、每条 4–120 字符）。新版本取代当前版本，旧版本保留为历史；与当前版本完全相同时不追加。checkpoint 与 end 提交时，若目录已确认且该 Concept 的目录条目有页码，要点页码必须落在该范围内。只含带要点的 Concept 的记录不算空记录（CR-2026-011）。
 - v0.1.3：`source_ref` 可带 `node`。checkpoint 与 end 提交时，新 Concept 若省略 `source_ref`，Runtime 以当前位置补齐；`source_ref` 与当前章节相同但缺 `node` 时补上 node。Detour 期间与 annotate 不做补齐。补齐发生在计算记录哈希之前。
@@ -252,6 +255,7 @@ Runtime 以确定性规则计算单个 Next Best Learning Action，Agent 在 Ses
 | R0 | 当前 Curriculum 无 Assessment，且没有任何 Session 以 `--skip-baseline` 显式跳过 | `baseline` |
 | R1 | 存在未结束 Detour，且 Detour 主题 Concept 已达 `developing` 以上 | `return_to_mainline`，relation `return` |
 | R2 | 当前章节范围内有未被 correction 或 change 解决的 misconception | `repair_misconception` |
+| R2b | 存在开放的学习者问题，其 `node` 等于当前位置，或其 `concept` 为当前概念（v0.1.6，CR-2026-020） | `address_question` |
 | R3 | 当前章节范围内有 `fragile` Concept | `retrieval_probe` |
 | R3b | 当前教材有按间隔复习计划到期（到期日不晚于今天）的 Concept，且本 Session 尚未复习它（v0.1.5，CR-2026-012） | `review_due` |
 | R4 | 当前 Concept 为 `developing`，有 explained 但无 applied 或 transferred | `transfer_probe`；无 applied 时 `application_probe` |
@@ -274,10 +278,10 @@ Runtime 以确定性规则计算单个 Next Best Learning Action，Agent 在 Ses
 
 | 文件 | 内容 |
 | --- | --- |
-| `Concepts/<id>.md` | 教材来源、学习者原话（带证据链接）、当前解释（标注为 AI）、状态与能力证据、误解与修正、开放问题、修订历史、用户笔记区 |
+| `Concepts/<概念名称>.md` | 教材来源、学习者原话（带证据链接）、当前解释（标注为 AI）、状态与能力证据、误解与修正、开放问题、修订历史、用户笔记区 |
 | `Sessions/<session>.md` | 起点、事件、认知变化、受影响 Concept、策略尝试、进度决策、`learn next` 结果 |
-| `Profile/learner-state.md` | 各 Concept 状态、待验证判断、有效与无效策略、Learning Pattern（含反例）、推荐下一步 |
-| `Curriculum/<id>/index.md` | 教材位置、Detour 历史、本教材 Concept 的状态，两者并列不互相替代 |
+| `Profile/学习者总览.md` | 各 Concept 状态、待验证判断、有效与无效策略、Learning Pattern（含反例）、推荐下一步 |
+| `Curriculum/<id>/<书名>.md` | 教材位置、Detour 历史、本教材 Concept 的状态，两者并列不互相替代 |
 
 - v0.1.2 不生成独立的 Questions、Hypotheses、Misconceptions、Insights 文件；这些内容保留在 Concept 和 Session 投影中。
 - 用户手写区：`<!-- learn:user:begin -->` 与 `<!-- learn:user:end -->` 之间的内容在重建和升级时逐字保留；文件缺少标记时，Runtime 追加空白用户区而不删除任何已有文本。

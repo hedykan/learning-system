@@ -24,7 +24,7 @@ func renderHome(in Inputs) string {
 		b.WriteString("当前没有激活的教材。告诉 Agent 你想学哪一本。\n")
 	default:
 		pos := in.Positions[in.Active]
-		fmt.Fprintf(&b, "- 教材：[[Curriculum/%s/index|%s]]\n", in.Active, in.Titles[in.Active])
+		fmt.Fprintf(&b, "- 教材：%s\n", link(CurriculumIndexFile(in.Active, in.Titles[in.Active]), in.Titles[in.Active]))
 		where := strings.Trim(strings.Join([]string{pos.Chapter, pos.Section}, " / "), " /")
 		if where == "" {
 			where = "尚未设定"
@@ -68,6 +68,13 @@ func renderHome(in Inputs) string {
 		b.WriteString("还没有需要复习的概念。\n")
 	}
 
+	if open := m.OpenQuestions(""); len(open) > 0 {
+		b.WriteString("\n## 我提出的问题\n\n")
+		for _, q := range open {
+			fmt.Fprintf(&b, "- %s\n", questionLink(m, q))
+		}
+	}
+
 	b.WriteString("\n## 我的教材\n\n")
 	if len(in.Library) == 0 {
 		b.WriteString("暂无。\n")
@@ -94,7 +101,7 @@ func renderHome(in Inputs) string {
 		if id == in.Active {
 			active = "（正在学习）"
 		}
-		fmt.Fprintf(&b, "- [[Curriculum/%s/index|%s]]%s：%s · [[Curriculum/%s/progress|进度]]\n", id, in.Titles[id], active, progress, id)
+		fmt.Fprintf(&b, "- %s%s：%s · %s\n", link(CurriculumIndexFile(id, in.Titles[id]), in.Titles[id]), active, progress, link(CurriculumProgressFile(id), "进度"))
 	}
 
 	b.WriteString("\n## 学习者总览\n\n")
@@ -107,7 +114,7 @@ func renderHome(in Inputs) string {
 			counts[c.State()]++
 			misconceptions += len(m.UnresolvedMisconceptions(c.ID))
 		}
-		fmt.Fprintf(&b, "- [[Profile/learner-state|查看学习者总览]]\n- 概念：形成中 %d 个，脆弱 %d 个，稳定 %d 个\n- 待修正的误解：%d 个\n",
+		fmt.Fprintf(&b, "- %s\n- 概念：形成中 %d 个，脆弱 %d 个，稳定 %d 个\n- 待修正的误解：%d 个\n", link(OverviewFile, "查看学习者总览"),
 			counts["developing"], counts["fragile"], counts["stable"], misconceptions)
 	}
 
@@ -186,6 +193,8 @@ func nextSentence(m *learner.Model, action, concept, node, nodeTitle string) str
 		return fmt.Sprintf("先修正「%s」上的误解", label)
 	case "retrieval_probe":
 		return fmt.Sprintf("先独立回忆一次「%s」", label)
+	case "address_question":
+		return "先回答你之前提出的问题"
 	case "review_due":
 		return fmt.Sprintf("复习到期的「%s」", label)
 	case "transfer_probe", "application_probe":

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -221,9 +222,18 @@ func End(ctx context.Context, root string, provider model.Provider, opts EndOpti
 		if err := anchorConcepts(root, active.Curriculum, opts.Analysis); err != nil {
 			return EndResult{}, err
 		}
-		check := func(m *learner.Model) error { return relationGate(m, active) }
-		if active.Kind == "baseline" {
-			check = nil
+		if err := checkQuestionNodes(root, active.Curriculum, opts.Analysis); err != nil {
+			return EndResult{}, err
+		}
+		rec := opts.Analysis
+		check := func(before, after *learner.Model) error {
+			if err := stableGate(before, after, rec); err != nil {
+				return err
+			}
+			if active.Kind == "baseline" {
+				return nil
+			}
+			return relationGate(after, active)
 		}
 		submitted, err := learner.SubmitChecked(root, active.ID, "end", opts.Analysis, now, check)
 		if err != nil {
@@ -277,6 +287,65 @@ func End(ctx context.Context, root string, provider model.Provider, opts EndOpti
 	}
 	result.Projections = refreshStatus(root)
 	return commitResult(root, result, "learning: complete "+active.ID)
+}
+
+// checkQuestionNodes requires a question's node to exist in the confirmed
+// outline, so a question can later be brought back at the right place.
+func checkQuestionNodes(root, curriculumID string, rec *record.Record) error {
+	for _, q := range rec.Questions {
+		if q.Node == "" {
+			continue
+		}
+		if curriculumID == "" {
+			return fmt.Errorf("question %s: node %q needs an active curriculum", q.ID, q.Node)
+		}
+		o, err := curriculum.LoadOutline(root, curriculumID)
+		if err != nil {
+			return err
+		}
+		if o.Status != "confirmed" {
+			return fmt.Errorf("question %s: node %q needs a confirmed outline", q.ID, q.Node)
+		}
+		if _, ok := o.Find(q.Node); !ok {
+			return fmt.Errorf("question %s: outline has no entry %q", q.ID, q.Node)
+		}
+	}
+	return nil
+}
+
+// stableGate refuses a record that shows a stable concept is not actually
+// understood (a misconception, or a partial or forgotten review) unless the
+// same record also downgrades it. The old stable judgment stays in history
+// (CR-2026-016). It only inspects new submissions, never replayed history.
+func stableGate(before, after *learner.Model, rec *record.Record) error {
+	if before == nil {
+		return nil
+	}
+	reasons := map[string]string{}
+	for _, e := range rec.Events {
+		if e.Type == "misconception" && e.Concept != "" {
+			reasons[e.Concept] = "a misconception"
+		}
+	}
+	for _, r := range rec.ReviewResults {
+		if r.Outcome == "partial" || r.Outcome == "forgotten" {
+			if _, ok := reasons[r.Concept]; !ok {
+				reasons[r.Concept] = "a " + r.Outcome + " review"
+			}
+		}
+	}
+	var blocked []string
+	for id, why := range reasons {
+		b, a := before.Concepts[id], after.Concepts[id]
+		if b != nil && a != nil && b.State() == "stable" && a.State() == "stable" {
+			blocked = append(blocked, fmt.Sprintf("- %s（%s）was stable, but this record shows %s", id, a.Label, why))
+		}
+	}
+	if len(blocked) == 0 {
+		return nil
+	}
+	sort.Strings(blocked)
+	return fmt.Errorf("the learner model must follow the new evidence: add a state_update that downgrades each concept below to fragile (the earlier stable judgment stays in history)\n%s", strings.Join(blocked, "\n"))
 }
 
 // relationGate refuses to end a session while concepts it touched have no
@@ -419,7 +488,15 @@ func Annotate(root, sessionID string, rec *record.Record, now time.Time) (Checkp
 }
 
 func submitAndRefresh(root, sessionID, kind string, rec *record.Record, now time.Time) (CheckpointResult, error) {
-	submitted, err := learner.Submit(root, sessionID, kind, rec, now)
+	conv, err := conversation.Load(conversation.Path(root, sessionID))
+	if err != nil {
+		return CheckpointResult{}, err
+	}
+	if err := checkQuestionNodes(root, conv.Curriculum, rec); err != nil {
+		return CheckpointResult{}, err
+	}
+	check := func(before, after *learner.Model) error { return stableGate(before, after, rec) }
+	submitted, err := learner.SubmitChecked(root, sessionID, kind, rec, now, check)
 	if err != nil {
 		return CheckpointResult{}, fmt.Errorf("validate interpretation record: %w", err)
 	}
@@ -547,11 +624,11 @@ func writeSessionFile(root string, active *runtimeState.ActiveSession, legacy *m
 	existing, _ := os.ReadFile(path)
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nid: %s\ndate: %s\nkind: %s\ntermination: %s\ndepth: %q\ndomain: %q\nsource_conversation: %q\ncurriculum: %q\ngenerated_by: learn\n---\n\n", active.ID, now.UTC().Format("2006-01-02"), active.Kind, termination, active.Depth, active.Domain, active.Conversation, active.Curriculum)
-	fmt.Fprintf(&b, "# %s\n\n## Starting Point\n\nChapter: %s  \nSection: %s  \nConcept: %s\n\n", active.ID, valueOrNone(active.StartingChapter), valueOrNone(active.StartingSection), valueOrNone(active.StartingConcept))
+	fmt.Fprintf(&b, "# 学习记录 %s\n\n## 起点\n\n章节：%s  \n小节：%s  \n概念：%s\n\n", sessionTitle(active.ID), valueOrNone(active.StartingChapter), valueOrNone(active.StartingSection), valueOrNone(active.StartingConcept))
 	if termination == "aborted" {
-		fmt.Fprintf(&b, "## Termination\n\nAborted: %s\n\n", reason)
+		fmt.Fprintf(&b, "## 结束方式\n\n中止：%s\n\n", reason)
 	} else if reason != "" {
-		fmt.Fprintf(&b, "## Termination\n\nEnded without interpretation: %s\n\n", reason)
+		fmt.Fprintf(&b, "## 结束方式\n\n未提交解读就结束：%s\n\n", reason)
 	}
 	if legacy != nil {
 		renderLegacyAnalysis(&b, legacy)
@@ -568,28 +645,28 @@ func writeSessionFile(root string, active *runtimeState.ActiveSession, legacy *m
 }
 
 func renderLegacyAnalysis(b *strings.Builder, analysis *model.SessionAnalysis) {
-	b.WriteString("## Learning Events\n\n")
+	b.WriteString("## 学习事件\n\n")
 	if len(analysis.Events) == 0 {
-		b.WriteString("No validated learning events.\n\n")
+		b.WriteString("没有经过校验的学习事件。\n\n")
 	}
 	for _, event := range analysis.Events {
-		fmt.Fprintf(b, "- **%s**: %s\n  - Evidence: %s\n", event.Type, event.Summary, event.Evidence)
+		fmt.Fprintf(b, "- **%s**：%s\n  - 证据：%s\n", event.Type, event.Summary, event.Evidence)
 	}
-	b.WriteString("\n## Cognitive Changes\n\n")
+	b.WriteString("\n## 认知变化\n\n")
 	if len(analysis.CognitiveChanges) == 0 {
-		b.WriteString("No validated cognitive change.\n")
+		b.WriteString("没有经过校验的认知变化。\n")
 	}
 	for _, change := range analysis.CognitiveChanges {
 		fmt.Fprintf(b, "- %s → (%s) → %s\n", change.OldUnderstanding, change.Trigger, change.NewUnderstanding)
 	}
-	b.WriteString("\n## Open Loops\n\n")
+	b.WriteString("\n## 开放问题\n\n")
 	if len(analysis.OpenLoops) == 0 {
-		b.WriteString("None recorded.\n")
+		b.WriteString("暂无。\n")
 	}
 	for _, loop := range analysis.OpenLoops {
 		fmt.Fprintf(b, "- %s\n", loop)
 	}
-	fmt.Fprintf(b, "\n## Next Probe\n\n%s\n", analysis.NextProbe)
+	fmt.Fprintf(b, "\n## 下一步检验\n\n%s\n", analysis.NextProbe)
 }
 
 func commitResult(root string, result EndResult, message string) (EndResult, error) {
@@ -609,7 +686,16 @@ func commitResult(root string, result EndResult, message string) (EndResult, err
 
 func valueOrNone(value string) string {
 	if value == "" {
-		return "Not set"
+		return "未设置"
 	}
 	return value
+}
+
+// sessionTitle turns session-20260924-090233.584 into 2026-09-24 09:02.
+func sessionTitle(id string) string {
+	raw := strings.TrimPrefix(id, "session-")
+	if len(raw) < 13 {
+		return id
+	}
+	return fmt.Sprintf("%s-%s-%s %s:%s", raw[0:4], raw[4:6], raw[6:8], raw[9:11], raw[11:13])
 }

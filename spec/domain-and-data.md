@@ -29,15 +29,16 @@ Vault/
 │       ├── original/<file>
 │       └── extracted/
 ├── README.md             # v0.1.4 生成的学习首页
+├── Questions/            # v0.1.6 学习者关键问题笔记，按需创建
 ├── Concepts/
 ├── Curriculum/
 │   └── <curriculum-id>/
 │       ├── book.md
 │       ├── outline.yaml
 │       ├── current-position.md
-│       ├── progress.md       # v0.1.3 起由 progress.yaml 生成
+│       ├── 学习进度.md       # 由 progress.yaml 生成（v0.1.6 前为 progress.md）
 │       ├── progress.yaml     # v0.1.3 完成、跳过与 Session 记录，append-only
-│       ├── index.md          # v0.1.2 投影
+│       ├── <书名>.md         # 教材首页投影（v0.1.6 前为 index.md）
 │       └── detours.yaml      # v0.1.2 Detour 日志
 ├── Profile/
 ├── AGENTS.md

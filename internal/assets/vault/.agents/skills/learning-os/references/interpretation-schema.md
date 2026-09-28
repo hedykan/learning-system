@@ -36,6 +36,12 @@ All arrays are optional, but a record must contain at least one item. Unknown fi
     {"id": "r1", "concept": "tail-latency", "outcome": "recalled", "action_turn": "t0020", "evidence": [{"turn": "t0021", "quote": "..."}]}
   ],
   "no_related": ["concept-id"],
+  "questions": [
+    {"id": "why-ask-if-unchanged", "question": "内容没变为什么还要问一次", "concept": "negotiated-cache", "node": "3.2", "evidence": [{"turn": "t0027", "quote": "..."}]}
+  ],
+  "question_resolutions": [
+    {"question": "why-ask-if-unchanged", "summary": "...", "evidence": [{"turn": "t0040", "quote": "..."}]}
+  ],
   "retractions": [{"ref": "session-...:e3", "reason": "..."}],
   "progress_decision": {"decision": "stay", "reason": "..."}
 }
@@ -67,4 +73,5 @@ All arrays are optional, but a record must contain at least one item. Unknown fi
 - `review_results.outcome`: `recalled`, `partial`, or `forgotten`; `action_turn` is your question in this session and evidence comes after it.
 - `no_related`: concepts you checked and found unrelated to every existing concept; the end-of-session check stops asking about them until a relation is added.
 - A record may carry only concepts with textbook points or relations, or only `no_related`.
-- A pattern becomes `supported` only with support from at least two sessions and two curricula, and more support than contradiction.
+- `questions`: global kebab-case `id`, `question` of 4–120 characters, optional existing `concept`, optional `node` that exists in the confirmed outline, learner evidence required. `question_resolutions` closes a question once, with learner evidence.
+- A pattern becomes `supported` with more support than contradiction and either support from two curricula across at least two sessions, or support from at least three sessions.

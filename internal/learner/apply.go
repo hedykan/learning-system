@@ -58,7 +58,7 @@ func (m *Model) Apply(env record.Envelope, resolver TurnResolver) error {
 		return fmt.Errorf("record curriculum %q does not match session curriculum %q", env.Record.Curriculum, info.Curriculum)
 	}
 	info.Records++
-	steps := []func() error{a.concepts, a.relations, a.noRelated, a.events, a.changes, a.attempts, a.stateUpdates, a.reviews, a.patterns, a.retractions, a.progress}
+	steps := []func() error{a.concepts, a.relations, a.noRelated, a.events, a.changes, a.attempts, a.stateUpdates, a.questions, a.reviews, a.patterns, a.retractions, a.progress}
 	for _, step := range steps {
 		if err := step(); err != nil {
 			return err
@@ -575,6 +575,65 @@ func hasRelation(c *Concept, other string) bool {
 		}
 	}
 	return false
+}
+
+// questions records new key questions, then resolutions.
+func (a *applier) questions() error {
+	for _, q := range a.rec.Questions {
+		what := "question " + q.ID
+		if !slugPattern.MatchString(q.ID) {
+			return fmt.Errorf("%s: id must be a kebab-case slug", what)
+		}
+		data, _ := json.Marshal(q)
+		key := "question:" + q.ID
+		if prev, ok := a.m.itemJSON[key]; ok {
+			if prev == string(data) {
+				continue
+			}
+			return fmt.Errorf("%s: id was already used for a different question", what)
+		}
+		if n := utf8.RuneCountInString(strings.TrimSpace(q.Question)); n < 4 || n > 120 {
+			return fmt.Errorf("%s: question must be 4-120 characters", what)
+		}
+		if q.Concept != "" {
+			if err := a.requireConcept(what, q.Concept); err != nil {
+				return err
+			}
+		}
+		refs, _, err := a.evidence(what, q.Evidence)
+		if err != nil {
+			return err
+		}
+		a.m.itemJSON[key] = string(data)
+		a.m.Questions[q.ID] = &QuestionItem{ID: q.ID, Question: strings.TrimSpace(q.Question), Concept: q.Concept, Node: q.Node,
+			Curriculum: a.rec.Curriculum, Session: a.env.Session, At: a.env.SubmittedAt, Order: a.nextOrder(), Evidence: refs, Status: "open"}
+	}
+	for _, r := range a.rec.QuestionResolutions {
+		what := "question resolution " + r.Question
+		q := a.m.Questions[r.Question]
+		if q == nil {
+			return fmt.Errorf("%s: unknown question", what)
+		}
+		data, _ := json.Marshal(r)
+		key := "resolution:" + r.Question
+		if prev, ok := a.m.itemJSON[key]; ok {
+			if prev == string(data) {
+				continue
+			}
+			return fmt.Errorf("%s: the question is already resolved", what)
+		}
+		if err := nonEmpty(what, map[string]string{"summary": r.Summary}); err != nil {
+			return err
+		}
+		refs, _, err := a.evidence(what, r.Evidence)
+		if err != nil {
+			return err
+		}
+		a.m.itemJSON[key] = string(data)
+		q.Status = "resolved"
+		q.Resolution = &QuestionAnswer{Session: a.env.Session, At: a.env.SubmittedAt, Summary: r.Summary, Evidence: refs}
+	}
+	return nil
 }
 
 func (a *applier) reviews() error {

@@ -17,6 +17,37 @@ printf '%s' "$RECORD_JSON" | learn session checkpoint --analysis-file - --json
 
 `accepted` means the record, learner model, and notes were updated. `unchanged` means an identical record already exists. Submit only new items; repeating an item with the same `id` and the same content is harmless, but reusing an `id` for different content is rejected.
 
+## Choosing the event type
+
+Label by what the learner did, not by how impressive it sounded:
+
+| Type | Use when | Not when |
+| --- | --- | --- |
+| `application` | A new problem of the same type and domain as one already taught (another max-age timing, another hit-rate calculation). | The problem is only reworded or the numbers changed; that is still application, not transfer. |
+| `transfer` | The learner maps the idea onto a clearly different domain or problem type on their own (cache staleness → an inventory dashboard synced hourly). | The scenario is the same kind as in the lesson (another stale CSS file). |
+| `learner_proposed_method` | The learner invents a solution, derivation, or design before being told, even if it matches the book (“compare a fingerprint of the file”). | The learner restates a method you just explained. |
+| `insight` | The learner spontaneously states a distinction or rule that was not just explained (“更快就更可能旧”). | The learner summarizes or paraphrases what you just taught. |
+| `retrieval` | Without a prompt, the learner uses knowledge from an earlier session. Cite both the current turn and the turn in the earlier session where it was learned (`<session-id>#tNNNN`, find it with `learn session turns --session <id> --json`). | You asked a review question; record that as a `review_results` item plus retrieval. |
+| `connection` | The learner links two concepts they both already know. | The link is really a use of old knowledge in a new problem; that is retrieval or application. |
+| `question` in `questions` | The learner asks something that changes or extends the direction of study. See “Key questions”. | A clarification such as “什么意思？” |
+
+A remark about how the learner learns (“我每次要看具体例子才懂”) is a `pattern_observations` item, never an event.
+
+## Key questions
+
+When the learner asks a question that points beyond the current explanation (“既然没变为什么还要问？”), save it as a first-class question:
+
+```json
+{"questions": [{"id": "why-ask-if-unchanged", "question": "内容没变为什么还要问一次", "concept": "negotiated-cache", "node": "3.2",
+  "evidence": [{"turn": "t0027", "quote": "为什么还非得去问这一次"}]}]}
+```
+
+Give `node` when the book answers it in a later section; `learn next` will bring it back there (`address_question`). When the learner can answer it, close it with `question_resolutions` and their own words as evidence. `learn next` lists open questions in `open_questions`; weave them in when relevant.
+
+## Downgrading a stable concept
+
+If a concept is currently `stable` and this record shows a misconception on it or a `partial`/`forgotten` review, add a `state_update` to `fragile` in the same record. The Runtime rejects the record otherwise. The earlier stable judgment stays in history.
+
 ## Writing a good record
 
 1. Cite learner turns only. Quote 4–200 characters copied from the turn text; whitespace differences are tolerated, paraphrase is not.
