@@ -14,6 +14,15 @@ Use this when the learner wants to learn a direction and has no textbook ("我�
 6. Attach sources to every leaf entry: `learn source add <url|file> --id <id>` (a web page is snapshotted; see [curriculum import](curriculum-import.md)), then `learn source attach <node> <source> <kind> <value>`. `learn source check --json` must report no `unsourced` entries before you rely on them.
 7. When `learn next` says `unsourced: true`, tell the learner in one sentence that this part has no source yet and your explanation is a general account; do not submit `textbook_points` there (they are refused).
 
+## A goal and a textbook together
+
+When the learner gives both a goal and a material ("我想能做数据库选型，手上有 DDIA"):
+
+- If the material, read in its own order, already serves the goal, import it as usual (source-aligned). Use the goal to decide what to emphasize and which parts to propose skipping (`skip` proposals, with the learner's words as evidence).
+- Otherwise build a goal curriculum and make the material its main resource: `learn source add <material> --id <id>`, then attach the relevant chapters or pages to each entry. Find other sources only for entries the material does not cover, and tell the learner which entries those are.
+
+Say in one sentence which of the two you chose and why.
+
 ## Changing a curriculum
 
 Never edit a confirmed outline behind the learner's back. When the learner's words show the curriculum should change, put a proposal in the record, with their words as evidence:
