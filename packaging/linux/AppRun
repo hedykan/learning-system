@@ -1,0 +1,4 @@
+#!/bin/sh
+# Run the bundled learn CLI with the caller's arguments and working directory.
+HERE=$(dirname "$(readlink -f "$0")")
+exec "$HERE/usr/bin/learn" "$@"

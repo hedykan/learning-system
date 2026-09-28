@@ -1,4 +1,4 @@
-.PHONY: test test-race vet build install build-all test-windows-build
+.PHONY: test test-race vet build install build-all release test-windows-build
 
 test:
 	go test ./...
@@ -23,6 +23,11 @@ build-all:
 	GOOS=linux GOARCH=amd64 go build -o dist/learn-linux-amd64 ./cmd/learn
 	GOOS=windows GOARCH=amd64 go build -o dist/learn-windows-amd64.exe ./cmd/learn
 	GOOS=windows GOARCH=arm64 go build -o dist/learn-windows-arm64.exe ./cmd/learn
+
+# Release packages into dist/ (Linux AppImages need a Linux host; CI does this
+# on every v* tag). Usage: make release TAG=v0.1.7
+release:
+	scripts/release.sh $(TAG)
 
 test-windows-build:
 	GOOS=windows GOARCH=amd64 go vet ./...

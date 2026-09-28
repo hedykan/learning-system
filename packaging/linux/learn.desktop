@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=learn
+Comment=Personal Learning OS runtime
+Exec=learn
+Icon=learn
+Terminal=true
+Categories=Education;

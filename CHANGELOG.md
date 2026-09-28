@@ -1,5 +1,10 @@
 # Changelog
 
+## 未发布
+
+- 发布流程：推送版本标签时 GitHub Actions 自动测试并打包 macOS（x64、arm64）、Windows（x86、x64、arm64）与 Linux（x86、x64、arm64、armv7；AppImage 与 tar.gz），上传到 Release；可手动补发旧版本。
+- README：仓库已公开，删除私有仓库的拉取配置，新增下载二进制的安装方式。
+
 ## v0.1.7 — 2026-09-28
 
 - 界面语言：`learn init --language`、`learn config set language <zh|en>`；生成页面的固定文字、固定页面名（`Learner overview.md`、`Progress.md`）、手写区标题与策略理由跟随设置，缺省中文且与 v0.1.6 输出一致；切换时自动迁移页面并保留手写区。Skill 按学习者使用的语言自动设置。

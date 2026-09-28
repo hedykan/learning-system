@@ -36,8 +36,6 @@ Learner Model
 > 把下面这句话发给 Codex 或 Claude：
 >
 > `读 https://raw.githubusercontent.com/hedykan/learning-system/main/README.md 并按其中「给 AI 代理」一节安装，然后带我开始学习。`
->
-> 这需要仓库是公开的。私有仓库请使用下面的「手动安装」。
 
 ## 为什么需要它
 
@@ -107,18 +105,33 @@ AI 可以重新判断你是否真正理解了一个概念，但已经发生过�
 
 ## 手动安装
 
-需要 Go 1.23+ 和 Git，支持 macOS、Linux、Windows。
+需要 Git。
+
+### 下载二进制（不需要 Go）
+
+从 [Releases](https://github.com/hedykan/learning-system/releases/latest) 下载对应的文件：
+
+| 系统 | x86（32 位） | x64 | ARM |
+| --- | --- | --- | --- |
+| macOS | — | `learn-<版本>-macos-x64.tar.gz` | `learn-<版本>-macos-arm64.tar.gz`（Apple 芯片） |
+| Windows | `learn-<版本>-windows-x86.zip` | `learn-<版本>-windows-x64.zip` | `learn-<版本>-windows-arm64.zip` |
+| Linux | `learn-<版本>-linux-x86.AppImage` | `learn-<版本>-linux-x64.AppImage` | `learn-<版本>-linux-arm64.AppImage`、`learn-<版本>-linux-armv7.AppImage` |
+
+Linux 每种架构还提供同名的 `.tar.gz`，里面是普通二进制，适合服务器和容器。
+
+- **macOS**：解压后把 `learn` 放到 PATH 中的目录（如 `/usr/local/bin`）。浏览器下载的文件会被系统拦截，先运行一次 `xattr -d com.apple.quarantine learn`。
+- **Windows**：解压后把 `learn.exe` 所在目录加入 PATH。
+- **Linux**：`chmod +x learn-*.AppImage`，改名为 `learn` 放到 PATH 中。没有 FUSE 的环境（如容器内）改用 `.tar.gz`，解压即可运行。
+
+`SHA256SUMS.txt` 可用来校验下载的文件。
+
+### 用 Go 安装
+
+需要 Go 1.23+：
 
 ```bash
 go install github.com/hedykan/learning-system/cmd/learn@latest
 learn version
-```
-
-私有仓库先配置一次拉取方式：
-
-```bash
-go env -w GOPRIVATE=github.com/hedykan
-git config --global url."git@github.com:hedykan/".insteadOf "https://github.com/hedykan/"
 ```
 
 找不到 `learn` 时，把 `go env GOPATH` 下的 `bin` 加入 PATH。
@@ -161,15 +174,17 @@ Agent 会读取 Vault 内的 Skill，自行调用 `learn`。
 
 你正在为用户安装 Personal Learning OS。按顺序执行，每步用工具确认成功再继续；除必要选择外不要打断用户。
 
-1. 确认 `go version` 为 1.23 及以上，且 `git` 可用。缺少则告知用户先安装。
+1. 确认 `git` 可用。缺少则告知用户先安装。
 
 2. 安装 Runtime：
 
-   ```bash
-   go install github.com/hedykan/learning-system/cmd/learn@latest
-   ```
+   - 有 Go 1.23 及以上时：
 
-   若报鉴权或找不到模块的错误，说明这是私有仓库：让用户确认已配置 `GOPRIVATE=github.com/hedykan` 与对应的 Git SSH 拉取，或把仓库设为公开。
+     ```bash
+     go install github.com/hedykan/learning-system/cmd/learn@latest
+     ```
+
+   - 没有 Go 时：按「手动安装 → 下载二进制」从最新 Release 下载与系统、架构对应的文件，放到 PATH 中。
 
 3. 运行：
 
@@ -177,7 +192,7 @@ Agent 会读取 Vault 内的 Skill，自行调用 `learn`。
    learn version
    ```
 
-   确认输出版本号（如 `learn v0.1.5` 或更高）。
+   确认输出版本号（如 `learn v0.1.7` 或更高）。
 
    若命令未找到，提示用户把 `go env GOPATH` 下的 `bin` 加入 PATH。
 

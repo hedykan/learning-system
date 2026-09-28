@@ -1,0 +1,64 @@
+# Publish a GitHub Release with packages for macOS, Windows and Linux
+# (AppImage) whenever a version tag is pushed. Run it manually with an
+# existing tag to (re)build that release, e.g. to backfill v0.1.5.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build, e.g. v0.1.5
+        required: true
+      skip_tests:
+        description: Skip go test (for old tags whose tests depend on their era)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # create the release and upload packages; nothing else
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out packaging files
+        uses: actions/checkout@v4
+        with:
+          path: ci
+
+      - name: Check out the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          path: src
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      - name: Test
+        if: ${{ !inputs.skip_tests }}
+        working-directory: src
+        run: go test ./...
+
+      - name: Build packages
+        run: ci/scripts/release.sh "$TAG" src
+
+      - name: Publish release
+        run: |
+          ci/scripts/release-notes.sh "$TAG" src/CHANGELOG.md > notes.md
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" ci/dist/learn-* ci/dist/SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" ci/dist/learn-* ci/dist/SHA256SUMS.txt \
+              --title "$TAG" --notes-file notes.md --verify-tag --repo "$GITHUB_REPOSITORY"
+          fi
