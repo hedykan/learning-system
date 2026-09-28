@@ -23,6 +23,13 @@ type cli struct {
 func newCLI(t *testing.T) *cli {
 	c := &cli{t: t, root: filepath.Join(t.TempDir(), "vault"), clock: time.Date(2026, 10, 1, 4, 0, 0, 0, time.UTC)}
 	t.Setenv("LEARN_NOW", c.clock.Format(time.RFC3339))
+	// Vault auto commits need a Git identity; CI machines have none.
+	for _, k := range []string{"GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME"} {
+		t.Setenv(k, "Learning OS test")
+	}
+	for _, k := range []string{"GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"} {
+		t.Setenv(k, "test@example.invalid")
+	}
 	return c
 }
 

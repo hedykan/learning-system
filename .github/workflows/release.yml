@@ -28,6 +28,11 @@ jobs:
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
+      # Tests make real Vault commits; the runner has no Git identity.
+      GIT_AUTHOR_NAME: Learning OS CI
+      GIT_AUTHOR_EMAIL: ci@example.invalid
+      GIT_COMMITTER_NAME: Learning OS CI
+      GIT_COMMITTER_EMAIL: ci@example.invalid
     steps:
       - name: Check out packaging files
         uses: actions/checkout@v4
