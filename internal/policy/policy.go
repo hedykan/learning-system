@@ -4,10 +4,10 @@
 package policy
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/i18n"
 	"github.com/hedykan/learning-system/internal/learner"
 )
 
@@ -22,6 +22,8 @@ type Context struct {
 	NextNode *curriculum.Node
 	// Today is the learner's local date (YYYY-MM-DD); empty disables R3b.
 	Today string
+	// Lang is the interface language of Reason texts (CR-2026-023).
+	Lang string
 }
 
 // Action is one Next Best Learning Action.
@@ -90,7 +92,7 @@ func decide(m *learner.Model, ctx Context) Action {
 		relation = "detour"
 	}
 	if ctx.Curriculum != "" && !ctx.Assessed && !ctx.BaselineSkipped {
-		return Action{Action: "baseline", CurriculumRelation: relation, Rule: "R0-no-baseline", Reason: "当前教材还没有摸底评估"}
+		return Action{Action: "baseline", CurriculumRelation: relation, Rule: "R0-no-baseline", Reason: i18n.T(ctx.Lang, "当前教材还没有摸底评估")}
 	}
 	if d := pos.Detour; d != nil {
 		key := d.Concept
@@ -103,7 +105,7 @@ func decide(m *learner.Model, ctx Context) Action {
 				target = rc.ID
 			}
 			return Action{Action: "return_to_mainline", Concept: target, Situation: "new_concept", CurriculumRelation: "return",
-				Rule: "R1-detour-resolved", Reason: fmt.Sprintf("先修主题「%s」已达 %s，应回到返回点", c.Label, c.State()),
+				Rule: "R1-detour-resolved", Reason: i18n.F(ctx.Lang, "先修主题「%s」已达 %s，应回到返回点", c.Label, c.State()),
 				Evidence: []string{c.Current().GID}}
 		}
 	}
@@ -112,7 +114,7 @@ func decide(m *learner.Model, ctx Context) Action {
 		if open := m.UnresolvedMisconceptions(c.ID); len(open) > 0 {
 			latest := open[len(open)-1]
 			return Action{Action: "repair_misconception", Concept: c.ID, Situation: "misconception", CurriculumRelation: relation,
-				Rule: "R2-open-misconception", Reason: fmt.Sprintf("「%s」有尚未修正的误解：%s", c.Label, latest.Summary),
+				Rule: "R2-open-misconception", Reason: i18n.F(ctx.Lang, "「%s」有尚未修正的误解：%s", c.Label, latest.Summary),
 				Evidence: []string{latest.GID}}
 		}
 	}
@@ -125,14 +127,14 @@ func decide(m *learner.Model, ctx Context) Action {
 				continue
 			}
 			return Action{Action: "address_question", Concept: q.Concept, Situation: "new_concept", CurriculumRelation: relation,
-				Rule: "R2b-open-question", Reason: fmt.Sprintf("学习者之前提出的问题在这里可以回答：%s", q.Question),
+				Rule: "R2b-open-question", Reason: i18n.F(ctx.Lang, "学习者之前提出的问题在这里可以回答：%s", q.Question),
 				Evidence: []string{q.Session + ":" + q.ID}}
 		}
 	}
 	for _, c := range scope {
 		if c.State() == "fragile" {
 			return Action{Action: "retrieval_probe", Concept: c.ID, Situation: "retrieval", CurriculumRelation: relation,
-				Rule: "R3-fragile", Reason: fmt.Sprintf("「%s」当前理解脆弱，需要重新检索验证", c.Label),
+				Rule: "R3-fragile", Reason: i18n.F(ctx.Lang, "「%s」当前理解脆弱，需要重新检索验证", c.Label),
 				Evidence: []string{c.Current().GID}}
 		}
 	}
@@ -143,7 +145,7 @@ func decide(m *learner.Model, ctx Context) Action {
 				continue
 			}
 			return Action{Action: "review_due", Concept: c.ID, Situation: "retrieval", CurriculumRelation: relation,
-				Rule: "R3b-review-due", Reason: fmt.Sprintf("「%s」按间隔复习计划在 %s 到期（第 %d 档，间隔 %d 天）", c.Label, s.Due, s.Level+1, s.Interval),
+				Rule: "R3b-review-due", Reason: i18n.F(ctx.Lang, "「%s」按间隔复习计划在 %s 到期（第 %d 档，间隔 %d 天）", c.Label, s.Due, s.Level+1, s.Interval),
 				Evidence: []string{s.Evidence}}
 		}
 	}
@@ -151,12 +153,12 @@ func decide(m *learner.Model, ctx Context) Action {
 	if current != nil && current.State() == "developing" {
 		caps := strings.Join(current.Capabilities(), ",")
 		if strings.Contains(caps, "explained") && !strings.Contains(caps, "transferred") {
-			action, missing := "transfer_probe", "迁移"
+			action, missing := "transfer_probe", i18n.T(ctx.Lang, "迁移")
 			if !strings.Contains(caps, "applied") {
-				action, missing = "application_probe", "应用"
+				action, missing = "application_probe", i18n.T(ctx.Lang, "应用")
 			}
 			return Action{Action: action, Concept: current.ID, Situation: "transfer", CurriculumRelation: relation,
-				Rule: "R4-missing-transfer", Reason: fmt.Sprintf("「%s」已能解释，但还没有%s证据", current.Label, missing),
+				Rule: "R4-missing-transfer", Reason: i18n.F(ctx.Lang, "「%s」已能解释，但还没有%s证据", current.Label, missing),
 				Evidence: []string{current.Current().GID}}
 		}
 	}
@@ -164,7 +166,7 @@ func decide(m *learner.Model, ctx Context) Action {
 		for _, c := range scope {
 			if gid := needsConsolidation(m, c, ctx.ActiveSession); gid != "" {
 				return Action{Action: "retrieval_probe", Concept: c.ID, Situation: "retrieval", CurriculumRelation: relation,
-					Rule: "R4b-consolidate", Reason: fmt.Sprintf("「%s」上次已能应用或迁移，推进前先在新的 Session 里独立回忆一次", c.Label),
+					Rule: "R4b-consolidate", Reason: i18n.F(ctx.Lang, "「%s」上次已能应用或迁移，推进前先在新的 Session 里独立回忆一次", c.Label),
 					Evidence: []string{gid}}
 			}
 		}
@@ -179,13 +181,13 @@ func decide(m *learner.Model, ctx Context) Action {
 			id = current.ID
 		}
 		return Action{Action: "explain_probe", Concept: id, Situation: "new_concept", CurriculumRelation: relation,
-			Rule: "R5-unobserved", Reason: fmt.Sprintf("「%s」还没有学习证据，先引出学习者的理解", target)}
+			Rule: "R5-unobserved", Reason: i18n.F(ctx.Lang, "「%s」还没有学习证据，先引出学习者的理解", target)}
 	}
 	act := Action{Action: "continue_curriculum", Situation: "new_concept", CurriculumRelation: relation,
-		Rule: "R6-continue", Reason: "当前范围没有待修复或待验证的理解，沿教材继续"}
+		Rule: "R6-continue", Reason: i18n.T(ctx.Lang, "当前范围没有待修复或待验证的理解，沿教材继续")}
 	if n := ctx.NextNode; n != nil {
 		act.Node, act.NodeTitle = n.ID, n.Title
-		act.Reason = fmt.Sprintf("当前范围没有待修复或待验证的理解，按目录进入 %s %s", n.ID, n.Title)
+		act.Reason = i18n.F(ctx.Lang, "当前范围没有待修复或待验证的理解，按目录进入 %s %s", n.ID, n.Title)
 	}
 	return act
 }

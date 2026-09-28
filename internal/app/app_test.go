@@ -133,7 +133,7 @@ func TestCLIInterpretationLoop(t *testing.T) {
 	if strings.Contains(rebuild, `"action": "update"`) || strings.Contains(rebuild, `"action": "create"`) {
 		t.Fatalf("rebuild should be a no-op after end: %s", rebuild)
 	}
-	if !strings.Contains(run("", false, "version"), "v0.1.6") {
+	if !strings.Contains(run("", false, "version"), "v0.1.7") {
 		t.Fatal("version not bumped")
 	}
 }

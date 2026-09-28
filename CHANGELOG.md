@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.7 — 2026-09-28
+
+- 界面语言：`learn init --language`、`learn config set language <zh|en>`；生成页面的固定文字、固定页面名（`Learner overview.md`、`Progress.md`）、手写区标题与策略理由跟随设置，缺省中文且与 v0.1.6 输出一致；切换时自动迁移页面并保留手写区。Skill 按学习者使用的语言自动设置。
+- 学习记录未提交提醒：记录自动提交结果；`status --json` 新增 `git_uncommitted`、`git_auto_commit`、`language`；自动提交失败时首页顶部提示在沙箱外运行 `learn commit`，提交成功后提醒自动消失。Session 结束时 Agent 可提一句尚未保存。Skill 中写死的中文页面名与“结束时绝不提 Git”的旧规则已同步修正。
+- 规划 [v0.1.8 资料接口](spec/versions/v0.1.8.md)：通用定位、资料适配器、多资料课程、外部资料、文字类格式、代码项目、网址快照、Agent 组织课程、数学公式写法（CR-2026-025 至 033）。
+
 ## v0.1.6 — 2026-09-28
 
 - 新增 [核心验证场景](spec/validation-scenarios.md)：17 个场景作为每个版本发布前的真实 Agent 验收标准。

@@ -15,6 +15,7 @@ import (
 	"github.com/hedykan/learning-system/internal/curriculum"
 	"github.com/hedykan/learning-system/internal/fsutil"
 	"github.com/hedykan/learning-system/internal/gitx"
+	"github.com/hedykan/learning-system/internal/i18n"
 	"github.com/hedykan/learning-system/internal/learner"
 	"github.com/hedykan/learning-system/internal/mdblock"
 	"github.com/hedykan/learning-system/internal/model"
@@ -515,13 +516,37 @@ func submitAndRefresh(root, sessionID, kind string, rec *record.Record, now time
 		return result, err
 	}
 	if cfg.Git.Enabled {
-		if err := gitx.CommitAll(root, fmt.Sprintf("learning: %s %s", kind, sessionID)); err != nil {
-			result.Git = "failed: " + err.Error()
-		} else {
-			result.Git = "committed"
-		}
+		result.Git = AutoCommit(root, fmt.Sprintf("learning: %s %s", kind, sessionID), time.Now())
 	}
 	return result, nil
+}
+
+// AutoCommit commits the Vault and records the outcome so the home page and
+// status can warn about unsaved history (CR-2026-024). When the outcome
+// changes, the home page is re-rendered: after a failure so the reminder
+// appears, after a success so a stale reminder is removed within the same
+// commit.
+func AutoCommit(root, message string, now time.Time) string {
+	prev := gitx.LoadAuto(root).Result
+	at := now.UTC().Format(time.RFC3339)
+	if _, err := gitx.Commit(root, message); err != nil {
+		_ = gitx.SaveAuto(root, gitx.AutoResult{Result: "failed", At: at, Error: err.Error()})
+		if prev != "failed" {
+			_ = Refresh(root)
+		}
+		return "failed: " + err.Error()
+	}
+	_ = gitx.SaveAuto(root, gitx.AutoResult{Result: "committed", At: at})
+	if prev != "committed" {
+		// The commit may include a home page that still shows the reminder;
+		// re-render it and fold the fix into the commit just made.
+		if err := Refresh(root); err == nil {
+			if err := gitx.AmendAll(root); err != nil {
+				return "failed: " + err.Error()
+			}
+		}
+	}
+	return "committed"
 }
 
 // Refresh replays all records, rewrites the model cache and projections.
@@ -624,49 +649,60 @@ func writeSessionFile(root string, active *runtimeState.ActiveSession, legacy *m
 	existing, _ := os.ReadFile(path)
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nid: %s\ndate: %s\nkind: %s\ntermination: %s\ndepth: %q\ndomain: %q\nsource_conversation: %q\ncurriculum: %q\ngenerated_by: learn\n---\n\n", active.ID, now.UTC().Format("2006-01-02"), active.Kind, termination, active.Depth, active.Domain, active.Conversation, active.Curriculum)
-	fmt.Fprintf(&b, "# 学习记录 %s\n\n## 起点\n\n章节：%s  \n小节：%s  \n概念：%s\n\n", sessionTitle(active.ID), valueOrNone(active.StartingChapter), valueOrNone(active.StartingSection), valueOrNone(active.StartingConcept))
+	lang := vaultLang(root)
+	t := func(s string) string { return i18n.T(lang, s) }
+	none := func(v string) string { return t(valueOrNone(v)) }
+	fmt.Fprintf(&b, t("# 学习记录 %s\n\n## 起点\n\n章节：%s  \n小节：%s  \n概念：%s\n\n"), sessionTitle(active.ID), none(active.StartingChapter), none(active.StartingSection), none(active.StartingConcept))
 	if termination == "aborted" {
-		fmt.Fprintf(&b, "## 结束方式\n\n中止：%s\n\n", reason)
+		fmt.Fprintf(&b, t("## 结束方式\n\n中止：%s\n\n"), reason)
 	} else if reason != "" {
-		fmt.Fprintf(&b, "## 结束方式\n\n未提交解读就结束：%s\n\n", reason)
+		fmt.Fprintf(&b, t("## 结束方式\n\n未提交解读就结束：%s\n\n"), reason)
 	}
 	if legacy != nil {
-		renderLegacyAnalysis(&b, legacy)
+		renderLegacyAnalysis(&b, legacy, t)
 		b.WriteString("\n")
 	}
 	if inner, ok := mdblock.Extract(string(existing), "analysis"); ok {
 		b.WriteString(mdblock.Block("analysis", inner) + "\n")
 	}
-	b.WriteString(mdblock.UserSection(mdblock.PreservedUser(string(existing), true)))
+	b.WriteString(mdblock.UserSectionIn(lang, mdblock.PreservedUser(string(existing), true)))
 	if err := fsutil.WriteFileAtomic(path, []byte(b.String()), 0o644); err != nil {
 		return "", err
 	}
 	return rel, nil
 }
 
-func renderLegacyAnalysis(b *strings.Builder, analysis *model.SessionAnalysis) {
-	b.WriteString("## 学习事件\n\n")
+func renderLegacyAnalysis(b *strings.Builder, analysis *model.SessionAnalysis, t func(string) string) {
+	b.WriteString(t("## 学习事件\n\n"))
 	if len(analysis.Events) == 0 {
-		b.WriteString("没有经过校验的学习事件。\n\n")
+		b.WriteString(t("没有经过校验的学习事件。\n\n"))
 	}
 	for _, event := range analysis.Events {
-		fmt.Fprintf(b, "- **%s**：%s\n  - 证据：%s\n", event.Type, event.Summary, event.Evidence)
+		fmt.Fprintf(b, t("- **%s**：%s\n  - 证据：%s\n"), event.Type, event.Summary, event.Evidence)
 	}
-	b.WriteString("\n## 认知变化\n\n")
+	b.WriteString(t("\n## 认知变化\n\n"))
 	if len(analysis.CognitiveChanges) == 0 {
-		b.WriteString("没有经过校验的认知变化。\n")
+		b.WriteString(t("没有经过校验的认知变化。\n"))
 	}
 	for _, change := range analysis.CognitiveChanges {
 		fmt.Fprintf(b, "- %s → (%s) → %s\n", change.OldUnderstanding, change.Trigger, change.NewUnderstanding)
 	}
-	b.WriteString("\n## 开放问题\n\n")
+	b.WriteString(t("\n## 开放问题\n\n"))
 	if len(analysis.OpenLoops) == 0 {
-		b.WriteString("暂无。\n")
+		b.WriteString(t("暂无。\n"))
 	}
 	for _, loop := range analysis.OpenLoops {
 		fmt.Fprintf(b, "- %s\n", loop)
 	}
-	fmt.Fprintf(b, "\n## 下一步检验\n\n%s\n", analysis.NextProbe)
+	fmt.Fprintf(b, t("\n## 下一步检验\n\n%s\n"), analysis.NextProbe)
+}
+
+// vaultLang is the configured interface language, Chinese when unreadable.
+func vaultLang(root string) string {
+	if cfg, err := config.Load(root); err == nil {
+		return i18n.Normalize(cfg.Language)
+	}
+	return i18n.Default
 }
 
 func commitResult(root string, result EndResult, message string) (EndResult, error) {
@@ -675,11 +711,7 @@ func commitResult(root string, result EndResult, message string) (EndResult, err
 		return result, err
 	}
 	if cfg.Git.Enabled {
-		if err := gitx.CommitAll(root, message); err != nil {
-			result.Git = "failed: " + err.Error()
-		} else {
-			result.Git = "committed"
-		}
+		result.Git = AutoCommit(root, message, time.Now())
 	}
 	return result, nil
 }

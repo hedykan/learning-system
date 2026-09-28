@@ -24,6 +24,7 @@ type Curriculum struct {
 
 type Config struct {
 	Version    int        `yaml:"version" json:"version"`
+	Language   string     `yaml:"language,omitempty" json:"language,omitempty"` // interface language; empty means zh
 	Model      Model      `yaml:"model" json:"model"`
 	Git        Git        `yaml:"git" json:"git"`
 	Curriculum Curriculum `yaml:"curriculum" json:"curriculum"`

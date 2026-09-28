@@ -15,6 +15,7 @@ import (
 	"github.com/hedykan/learning-system/internal/config"
 	"github.com/hedykan/learning-system/internal/curriculum"
 	"github.com/hedykan/learning-system/internal/gitx"
+	"github.com/hedykan/learning-system/internal/i18n"
 	"github.com/hedykan/learning-system/internal/learner"
 	"github.com/hedykan/learning-system/internal/model"
 	"github.com/hedykan/learning-system/internal/policy"
@@ -26,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.1.6"
+const Version = "0.1.7"
 
 type App struct {
 	Out      io.Writer
@@ -68,6 +69,7 @@ func (a *App) RootCommand() *cobra.Command {
 	root.AddCommand(a.modelCommand(&explicitVault))
 	root.AddCommand(a.commitCommand(&explicitVault))
 	root.AddCommand(a.reviewCommand(&explicitVault))
+	root.AddCommand(a.configCommand(&explicitVault))
 	_ = verbose
 	return root
 }
@@ -81,6 +83,7 @@ func (a *App) versionCommand() *cobra.Command {
 
 func (a *App) initCommand() *cobra.Command {
 	var asJSON bool
+	var language string
 	cmd := &cobra.Command{
 		Use: "init [path]", Short: "Initialize a Learning Vault", Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -88,9 +91,17 @@ func (a *App) initCommand() *cobra.Command {
 			if len(args) == 1 {
 				path = args[0]
 			}
+			if language != "" && !i18n.Valid(language) {
+				return fmt.Errorf("unsupported language %q; use one of %s", language, strings.Join(i18n.Languages, ", "))
+			}
 			result, err := vault.Init(path, a.Now())
 			if err != nil {
 				return err
+			}
+			if language != "" {
+				if err := setLanguage(result.Root, language); err != nil {
+					return err
+				}
 			}
 			if err := session.Refresh(result.Root); err != nil {
 				return fmt.Errorf("vault initialized, but writing the home page failed: %w", err)
@@ -103,6 +114,75 @@ func (a *App) initCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	cmd.Flags().StringVar(&language, "language", "", "interface language of generated pages (zh or en)")
+	return cmd
+}
+
+// vaultLanguage is the configured interface language of a Vault.
+func vaultLanguage(root string) string {
+	cfg, err := config.Load(root)
+	if err != nil {
+		return i18n.Default
+	}
+	return i18n.Normalize(cfg.Language)
+}
+
+func setLanguage(root, language string) error {
+	cfg, err := config.Load(root)
+	if err != nil {
+		return err
+	}
+	cfg.Language = language
+	return config.Save(root, cfg)
+}
+
+func (a *App) configCommand(explicitVault *string) *cobra.Command {
+	cmd := &cobra.Command{Use: "config", Short: "Show or change Vault settings"}
+	var asJSON bool
+	show := &cobra.Command{
+		Use: "show", Short: "Show Vault settings", Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			root, err := resolveVault(*explicitVault)
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(root)
+			if err != nil {
+				return err
+			}
+			out := map[string]any{"language": i18n.Normalize(cfg.Language), "git_enabled": cfg.Git.Enabled, "active_curriculum": cfg.Curriculum.Active}
+			if asJSON {
+				return writeJSON(cmd.OutOrStdout(), out)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "language: %s\ngit.enabled: %t\ncurriculum.active: %s\n", out["language"], cfg.Git.Enabled, cfg.Curriculum.Active)
+			return nil
+		},
+	}
+	show.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	set := &cobra.Command{
+		Use: "set <key> <value>", Short: "Change a Vault setting (supported key: language)", Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, err := resolveVault(*explicitVault)
+			if err != nil {
+				return err
+			}
+			if args[0] != "language" {
+				return fmt.Errorf("unknown setting %q; supported: language", args[0])
+			}
+			if !i18n.Valid(args[1]) {
+				return fmt.Errorf("unsupported language %q; use one of %s", args[1], strings.Join(i18n.Languages, ", "))
+			}
+			if err := setLanguage(root, args[1]); err != nil {
+				return err
+			}
+			if err := session.Refresh(root); err != nil {
+				return fmt.Errorf("language saved, but rebuilding pages failed (run 'learn model rebuild'): %w", err)
+			}
+			fmt.Fprintf(cmd.OutOrStdout(), "language: %s (pages rebuilt)\n", args[1])
+			return nil
+		},
+	}
+	cmd.AddCommand(show, set)
 	return cmd
 }
 
@@ -118,6 +198,9 @@ type statusOutput struct {
 	Uncovered       []curriculum.Node           `json:"uncovered"`
 	Partial         []curriculum.Node           `json:"partial"`
 	GitLastCommit   string                      `json:"git_last_commit"`
+	GitUncommitted  int                         `json:"git_uncommitted"`
+	GitAutoCommit   string                      `json:"git_auto_commit"`
+	Language        string                      `json:"language"`
 	LastSession     string                      `json:"last_session,omitempty"`
 	Projections     string                      `json:"projections"`
 	Git             string                      `json:"git"`
@@ -177,6 +260,11 @@ func (a *App) statusCommand(explicitVault *string) *cobra.Command {
 				out.Partial = []curriculum.Node{}
 			}
 			out.GitLastCommit = gitx.LastCommit(root)
+			out.GitAutoCommit = gitx.LoadAuto(root).Result
+			if n, err := gitx.Uncommitted(root); err == nil {
+				out.GitUncommitted = n
+			}
+			out.Language = i18n.Normalize(cfg.Language)
 			envs, err := record.LoadAll(root)
 			if err != nil {
 				return err
@@ -225,7 +313,7 @@ func writeHumanStatus(w io.Writer, out statusOutput) {
 		fmt.Fprintf(w, "Detour: %s (return to %s / %s)\n", out.Detour.Topic, valueOrNone(out.Detour.ReturnTo.Chapter), valueOrNone(out.Detour.ReturnTo.Concept))
 	}
 	fmt.Fprintf(w, "Baseline: %s\nProjections: %s\n", out.Baseline.State, out.Projections)
-	fmt.Fprintf(w, "Last Session: %s\nGit: %s\n", valueOrNone(out.LastSession), out.Git)
+	fmt.Fprintf(w, "Last Session: %s\nGit: %s (uncommitted: %d, last auto commit: %s)\nLanguage: %s\n", valueOrNone(out.LastSession), out.Git, out.GitUncommitted, out.GitAutoCommit, out.Language)
 }
 
 func (a *App) curriculumCommand(explicitVault *string) *cobra.Command {
@@ -946,7 +1034,7 @@ func (a *App) stateCommand(explicitVault *string) *cobra.Command {
 				return nil
 			}
 			if !asJSON {
-				data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(projection.OverviewFile)))
+				data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(projection.OverviewFile(vaultLanguage(root)))))
 				if err == nil {
 					_, err = cmd.OutOrStdout().Write(data)
 					return err
@@ -1427,13 +1515,12 @@ func (a *App) commitCommand(explicitVault *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			committed, err := gitx.Commit(root, message)
-			if err != nil {
-				return err
-			}
-			if !committed {
+			if n, err := gitx.Uncommitted(root); err == nil && n == 0 {
 				fmt.Fprintln(cmd.OutOrStdout(), "Nothing to commit.")
 				return nil
+			}
+			if result := session.AutoCommit(root, message, a.Now()); result != "committed" {
+				return fmt.Errorf("commit %s", result)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Committed: %s\n", message)
 			return nil

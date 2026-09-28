@@ -6,6 +6,16 @@ import "strings"
 
 const userHeading = "## 手写笔记\n\n"
 
+// userHeadings are the learner-area headings per interface language.
+var userHeadings = map[string]string{"zh": userHeading, "en": "## My notes\n\n"}
+
+func headingFor(lang string) string {
+	if h, ok := userHeadings[lang]; ok {
+		return h
+	}
+	return userHeadings["en"]
+}
+
 func markers(name string) (string, string) {
 	return "<!-- learn:" + name + ":begin -->", "<!-- learn:" + name + ":end -->"
 }
@@ -52,7 +62,10 @@ func Replace(text, name, inner string) (string, bool) {
 }
 
 // UserSection renders the preserved learner area.
-func UserSection(inner string) string { return userHeading + Block("user", inner) }
+func UserSection(inner string) string { return UserSectionIn("zh", inner) }
+
+// UserSectionIn renders the learner area with the heading of lang.
+func UserSectionIn(lang, inner string) string { return headingFor(lang) + Block("user", inner) }
 
 // PreservedUser returns what must survive a rewrite: the marked user block,
 // or, for a file the Runtime does not own, its entire existing content.
@@ -69,14 +82,22 @@ func PreservedUser(existing string, runtimeOwned bool) string {
 // Upsert places a named block in text: replace it, insert it before the user
 // section, or append it; an empty text becomes header + block + user section.
 func Upsert(text, name, inner, header string) string {
+	return UpsertIn("zh", text, name, inner, header)
+}
+
+// UpsertIn is Upsert with the learner-area heading of lang for new files; an
+// existing file keeps whichever heading it already has.
+func UpsertIn(lang, text, name, inner, header string) string {
 	if strings.TrimSpace(text) == "" {
-		return header + "\n" + Block(name, inner) + "\n" + UserSection("")
+		return header + "\n" + Block(name, inner) + "\n" + UserSectionIn(lang, "")
 	}
 	if replaced, ok := Replace(text, name, inner); ok {
 		return replaced
 	}
-	if i := strings.Index(text, userHeading); i >= 0 {
-		return text[:i] + Block(name, inner) + "\n" + text[i:]
+	for _, h := range userHeadings {
+		if i := strings.Index(text, h); i >= 0 {
+			return text[:i] + Block(name, inner) + "\n" + text[i:]
+		}
 	}
 	if !strings.HasSuffix(text, "\n") {
 		text += "\n"

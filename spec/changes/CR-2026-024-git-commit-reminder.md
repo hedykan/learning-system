@@ -1,7 +1,7 @@
 ---
 id: CR-2026-024
 title: "学习记录未提交到 Git 时提醒"
-status: accepted
+status: implemented
 target_version: v0.1.7
 created: 2026-09-28
 ---
@@ -32,3 +32,5 @@ created: 2026-09-28
 ## 决策
 
 2026-09-28 接受，排入 v0.1.7。
+
+2026-09-28 实现：提醒条件为“最近一次自动提交不是成功且有未提交改动”，避免成功提交前渲染的首页把提醒一并提交；结果变化时重建首页，成功时用 amend 并入同一提交。`git status` 使用 `--no-optional-locks`，沙箱内也能统计未提交数。

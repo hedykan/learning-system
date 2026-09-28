@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/hedykan/learning-system/internal/curriculum"
+	"github.com/hedykan/learning-system/internal/i18n"
 	"github.com/hedykan/learning-system/internal/learner"
 )
 
@@ -13,10 +14,20 @@ import (
 // labels, question text and book titles come from the Agent in that
 // language; fixed pages use the projection language. Internal IDs never
 // appear in file names, but stay in frontmatter aliases so old links resolve.
-const (
-	OverviewFile       = "Profile/学习者总览.md"
-	legacyOverviewFile = "Profile/learner-state.md"
-)
+const legacyOverviewFile = "Profile/learner-state.md"
+
+// OverviewFile is the learner overview page in the interface language.
+func OverviewFile(lang string) string { return "Profile/" + i18n.T(lang, "学习者总览") + ".md" }
+
+// overviewCandidates lists every overview path a Vault may hold, current
+// languages first, so staleness checks survive a language switch.
+func overviewCandidates() []string {
+	var out []string
+	for _, l := range i18n.Languages {
+		out = append(out, OverviewFile(l))
+	}
+	return append(out, legacyOverviewFile)
+}
 
 // unsafeName holds characters that are invalid in file names on some
 // platform or that break Obsidian links.
@@ -107,8 +118,8 @@ func CurriculumIndexFile(id, title string) string {
 }
 
 // CurriculumProgressFile is the generated progress page of a book.
-func CurriculumProgressFile(id string) string {
-	return "Curriculum/" + id + "/" + curriculum.ProgressFile
+func CurriculumProgressFile(id, lang string) string {
+	return "Curriculum/" + id + "/" + curriculum.ProgressFile(lang)
 }
 
 // link renders an Obsidian wikilink to a Vault-relative .md path.

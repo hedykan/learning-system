@@ -1,6 +1,7 @@
 // Package projection renders the Learner Model as human-readable Markdown.
-// Output depends only on records, curriculum state and resolver data, never
-// on the clock, so a rebuild reproduces the same bytes.
+// Output depends only on records, curriculum state and resolver data, so a
+// rebuild reproduces the same bytes; the home page's due reviews and Git
+// reminder are the exceptions and follow the clock and the Git state.
 package projection
 
 import (
@@ -16,6 +17,8 @@ import (
 	"github.com/hedykan/learning-system/internal/conversation"
 	"github.com/hedykan/learning-system/internal/curriculum"
 	"github.com/hedykan/learning-system/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/gitx"
+	"github.com/hedykan/learning-system/internal/i18n"
 	"github.com/hedykan/learning-system/internal/learner"
 	"github.com/hedykan/learning-system/internal/mdblock"
 	"github.com/hedykan/learning-system/internal/policy"
@@ -25,6 +28,7 @@ import (
 // Inputs is everything a projection needs besides the model.
 type Inputs struct {
 	Model      *learner.Model
+	Lang       string // interface language of fixed text (CR-2026-023)
 	Resolver   *learner.VaultResolver
 	Active     string
 	Titles     map[string]string
@@ -37,6 +41,13 @@ type Inputs struct {
 	Recent     []RecentSession
 	Today      string
 	Next       *policy.Action
+	Git        *GitReminder // nil when history is safely committed
+}
+
+// GitReminder describes Vault changes not yet saved to Git (CR-2026-024).
+type GitReminder struct {
+	Uncommitted int
+	LastCommit  string // ISO time of HEAD, "" when never committed
 }
 
 // RecentSession is one entry of the home page's recent sessions.
@@ -57,6 +68,12 @@ func Gather(root string, m *learner.Model) (Inputs, error) {
 		return in, err
 	}
 	in.Active = cfg.Curriculum.Active
+	in.Lang = i18n.Normalize(cfg.Language)
+	if cfg.Git.Enabled && gitx.IsRepo(root) && gitx.LoadAuto(root).Result != "committed" {
+		if n, err := gitx.Uncommitted(root); err == nil && n > 0 {
+			in.Git = &GitReminder{Uncommitted: n, LastCommit: gitx.LastCommit(root)}
+		}
+	}
 	in.Today = clock.Date(clock.Now())
 	ids := map[string]bool{}
 	for _, s := range m.Sessions {
@@ -84,7 +101,7 @@ func Gather(root string, m *learner.Model) (Inputs, error) {
 	for id := range ids {
 		manifest, err := curriculum.LoadManifest(root, id)
 		if err != nil {
-			in.Titles[id] = curriculum.ArchivedTitle(root, id) + "（已归档）"
+			in.Titles[id] = curriculum.ArchivedTitle(root, id) + in.t("（已归档）")
 			in.Archived[id] = true
 			continue
 		}
@@ -131,7 +148,7 @@ func Gather(root string, m *learner.Model) (Inputs, error) {
 			return in, err
 		}
 		ctx := policy.Context{Curriculum: in.Active, Assessed: status.State == "assessed", BaselineSkipped: skipped,
-			Position: in.Positions[in.Active], ActiveSession: active, Today: in.Today}
+			Position: in.Positions[in.Active], ActiveSession: active, Today: in.Today, Lang: in.Lang}
 		if n, ok := curriculum.NextNode(in.Outlines[in.Active], in.Statuses[in.Active], in.Positions[in.Active]); ok {
 			ctx.NextNode = &n
 		}
@@ -158,7 +175,7 @@ func Plan(root string, in Inputs) ([]File, error) {
 		if strings.TrimSpace(keep) == "" {
 			keep = orphans.userBlocks[rel]
 		}
-		rendered[rel] = body + "\n" + mdblock.UserSection(keep)
+		rendered[rel] = body + "\n" + mdblock.UserSectionIn(in.Lang, keep)
 	}
 	owned("README.md", renderHome(in))
 	for id := range in.Titles {
@@ -166,17 +183,17 @@ func Plan(root string, in Inputs) ([]File, error) {
 			continue
 		}
 		owned(CurriculumIndexFile(id, in.Titles[id]), renderCurriculum(in, id))
-		progress, err := curriculum.ProgressMarkdown(root, id, in.Model.NodesWithEvidence(id))
+		progress, err := curriculum.ProgressMarkdown(root, id, in.Model.NodesWithEvidence(id), in.Lang)
 		if err != nil {
 			return nil, err
 		}
-		rendered[CurriculumProgressFile(id)] = progress
+		rendered[CurriculumProgressFile(id, in.Lang)] = progress
 	}
 	if !in.Model.Empty() {
 		for _, c := range in.Model.ConceptList() {
 			owned(ConceptFile(in.Model, c.ID), renderConcept(in, c))
 		}
-		owned(OverviewFile, renderOverview(in))
+		owned(OverviewFile(in.Lang), renderOverview(in))
 		for _, q := range in.Model.QuestionList() {
 			owned(QuestionFile(in.Model, q.ID), renderQuestion(in, q))
 		}
@@ -184,8 +201,8 @@ func Plan(root string, in Inputs) ([]File, error) {
 	for id := range in.Model.Sessions {
 		rel := "Sessions/" + id + ".md"
 		existing, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
-		header := fmt.Sprintf("---\nid: %s\ngenerated_by: learn\n---\n\n# 学习记录 %s\n", id, sessionLabel(id))
-		rendered[rel] = mdblock.Upsert(string(existing), "analysis", renderSessionAnalysis(in, id), header)
+		header := fmt.Sprintf("---\nid: %s\ngenerated_by: learn\n---\n\n", id) + i18n.F(in.Lang, "# 学习记录 %s\n", sessionLabel(id))
+		rendered[rel] = mdblock.UpsertIn(in.Lang, string(existing), "analysis", renderSessionAnalysis(in, id), header)
 	}
 	paths := make([]string, 0, len(rendered))
 	for p := range rendered {
@@ -283,7 +300,7 @@ func findOrphans(root string, in Inputs) orphanSet {
 	})
 	scan("Profile", func(d string) string {
 		if frontValue(d, "projection") == "learner-overview" {
-			return OverviewFile
+			return OverviewFile(in.Lang)
 		}
 		return ""
 	})
@@ -296,8 +313,8 @@ func findOrphans(root string, in Inputs) orphanSet {
 			switch {
 			case frontValue(d, "projection") == "curriculum-index":
 				return CurriculumIndexFile(id, in.Titles[id])
-			case strings.Contains(d, "# 学习进度 — "):
-				return CurriculumProgressFile(id)
+			case curriculum.IsProgressPage(d):
+				return CurriculumProgressFile(id, in.Lang)
 			}
 			return ""
 		})
@@ -372,9 +389,12 @@ func recentSessions(root string, limit int) ([]RecentSession, error) {
 
 // Staleness compares the overview's generation with the current records.
 func Staleness(root, generation string) string {
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(OverviewFile)))
-	if err != nil {
-		data, err = os.ReadFile(filepath.Join(root, filepath.FromSlash(legacyOverviewFile)))
+	var data []byte
+	var err error
+	for _, rel := range overviewCandidates() {
+		if data, err = os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))); err == nil {
+			break
+		}
 	}
 	if err != nil {
 		if generation == "empty" {

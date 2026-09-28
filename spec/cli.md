@@ -14,11 +14,15 @@ learn version
 ## Vault
 
 ```bash
-learn init [path]
+learn init [path] [--language zh|en]
 learn status [--json]
+learn config show [--json]
+learn config set language <zh|en>
 ```
 
-`init` 可重复执行，不覆盖任何已有用户文件。命令从当前目录向上发现 `.learning/schema-version`，也可用 `--vault` 显式指定。
+`init` 可重复执行，不覆盖任何已有用户文件。
+
+界面语言（v0.1.7）：`.learning/config.yaml` 的 `language` 决定生成页面的固定文字与固定页面名（`学习者总览.md` / `Learner overview.md`，`学习进度.md` / `Progress.md`），缺省为 `zh`。`config set language` 保存后立即重建页面，旧语言的固定页面被删除，手写区迁移到新页面。已有 Session 文件的标题保持创建时的语言，其解读区按新语言重建。命令行输出始终为英文。`status --json` 输出 `language`。命令从当前目录向上发现 `.learning/schema-version`，也可用 `--vault` 显式指定。
 
 ## Curriculum
 
@@ -116,6 +120,8 @@ learn commit [--message <text>]
 ```
 
 提交 Vault 中尚未提交的变更，没有变更时明确提示。用于宿主沙箱阻止自动提交的情况。
+
+未提交提醒（v0.1.7）：每次自动提交的结果（`committed`、`failed`）记录在 Git 忽略的 `.learning/runtime/git.json`。`status --json` 输出 `git_uncommitted`（未提交的路径数）与 `git_auto_commit`（`committed`、`failed` 或 `none`）。Git 已启用、Vault 是 Git 仓库、有未提交改动、且最近一次自动提交不是成功时，首页顶部显示提醒与 `learn commit` 用法。提交结果变化时首页随即重建；成功时修正并入刚才的同一个提交，不会多出提交。
 
 ## 相关概念兜底（v0.1.5）
 

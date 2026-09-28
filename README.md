@@ -154,6 +154,7 @@ Agent 会读取 Vault 内的 Skill，自行调用 `learn`。
 - `README.md` 是学习首页，从这里可以跳到所有页面；
 - `Concepts/` 是每个概念的笔记，`Questions/` 是你提出的问题，`Profile/学习者总览.md` 汇总你的理解状态；每本书的文件夹里有以书名命名的教材首页和「学习进度」；
 - 笔记都以你学习时使用的语言命名，例如 `Concepts/缓存省去网络往返.md`；
+- 页面上的固定文字也跟随你的语言：用英文学习时会自动切换为英文（如 `Profile/Learner overview.md`），也可以运行 `learn config set language en` 手动切换；
 - 打开「关系图谱」可以看到概念之间的连接。在图谱设置的「分组」中按标签着色，例如 `tag:#learning/state/stable`、`tag:#learning/state/fragile`，就能一眼看出哪些已经稳定、哪些还脆弱。
 
 ## 给 AI 代理

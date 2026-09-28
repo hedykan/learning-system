@@ -11,7 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hedykan/learning-system/internal/config"
 	"github.com/hedykan/learning-system/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/i18n"
 	"gopkg.in/yaml.v3"
 )
 
@@ -541,20 +543,35 @@ func NextNode(o Outline, statuses []NodeStatus, pos Position) (Node, bool) {
 var StatusLabel = map[string]string{"completed": "✅ 已完成", "skipped": "↷ 已跳过", "in_progress": "▶ 进行中", "partial": "◐ 学过一部分", "uncovered": "⚠ 未覆盖", "not_started": "○ 未开始"}
 
 // ProgressFile is the generated progress page inside a curriculum folder.
-const ProgressFile = "学习进度.md"
+func ProgressFile(lang string) string { return i18n.T(lang, "学习进度") + ".md" }
+
+// IsProgressPage recognizes a generated progress page in any language.
+func IsProgressPage(data string) bool {
+	for _, l := range i18n.Languages {
+		if strings.Contains(data, "\n"+i18n.T(l, "# 学习进度 — ")) {
+			return true
+		}
+	}
+	return false
+}
 
 // RenderProgress regenerates the progress page using session evidence only; the
 // full projection refresh re-renders it with concept evidence as well.
 func RenderProgress(root, id string) error {
-	content, err := ProgressMarkdown(root, id, nil)
+	lang := i18n.Normalize("")
+	if cfg, err := config.Load(root); err == nil {
+		lang = i18n.Normalize(cfg.Language)
+	}
+	content, err := ProgressMarkdown(root, id, nil, lang)
 	if err != nil {
 		return err
 	}
-	return fsutil.WriteFileAtomic(filepath.Join(root, "Curriculum", id, ProgressFile), []byte(content), 0o644)
+	return fsutil.WriteFileAtomic(filepath.Join(root, "Curriculum", id, ProgressFile(lang)), []byte(content), 0o644)
 }
 
 // ProgressMarkdown renders progress.md; touched adds entries with evidence.
-func ProgressMarkdown(root, id string, touched map[string]bool) (string, error) {
+func ProgressMarkdown(root, id string, touched map[string]bool, lang string) (string, error) {
+	t := func(s string) string { return i18n.T(lang, s) }
 	o, err := LoadOutline(root, id)
 	if err != nil {
 		return "", err
@@ -582,21 +599,21 @@ func ProgressMarkdown(root, id string, touched map[string]bool) (string, error) 
 		title = m.Title
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "---\ngenerated_by: learn\ncurriculum: %s\n---\n\n# 学习进度 — %s\n\n", id, title)
-	b.WriteString("> 由 Learning OS 根据目录与完成记录生成。教材进度与理解程度相互独立。\n\n## 目录\n\n")
+	fmt.Fprintf(&b, "---\ngenerated_by: learn\ncurriculum: %s\n---\n\n%s%s\n\n", id, t("# 学习进度 — "), title)
+	b.WriteString(t("> 由 Learning OS 根据目录与完成记录生成。教材进度与理解程度相互独立。\n\n## 目录\n\n"))
 	if o.Status == "missing" {
-		b.WriteString("尚未建立目录。\n")
+		b.WriteString(t("尚未建立目录。\n"))
 	} else {
 		if o.Status == "draft" {
-			b.WriteString("目录为草稿，尚未经学习者确认。\n\n")
+			b.WriteString(t("目录为草稿，尚未经学习者确认。\n\n"))
 		}
 		for _, s := range Statuses(o, entries, pos, touched) {
-			fmt.Fprintf(&b, "%s- %s %s\n", strings.Repeat("  ", s.Depth-1), StatusLabel[s.Status], s.Label())
+			fmt.Fprintf(&b, "%s- %s %s\n", strings.Repeat("  ", s.Depth-1), t(StatusLabel[s.Status]), s.Label())
 		}
 	}
-	b.WriteString("\n## 记录\n\n")
+	b.WriteString(t("\n## 记录\n\n"))
 	if len(entries) == 0 {
-		b.WriteString("暂无。\n")
+		b.WriteString(t("暂无。\n"))
 	}
 	for _, e := range entries {
 		date := e.At
@@ -605,12 +622,12 @@ func ProgressMarkdown(root, id string, touched map[string]bool) (string, error) 
 		}
 		switch e.Kind {
 		case "completed", "skipped":
-			verb := map[string]string{"completed": "完成", "skipped": "跳过"}[e.Kind]
-			fmt.Fprintf(&b, "- %s %s %s %s：%s\n", date, verb, e.Node, e.Title, e.Reason)
+			verb := t(map[string]string{"completed": "完成", "skipped": "跳过"}[e.Kind])
+			fmt.Fprintf(&b, t("- %s %s %s %s：%s\n"), date, verb, e.Node, e.Title, e.Reason)
 		case "session":
-			fmt.Fprintf(&b, "- %s 结束学习 `%s`（位置：%s）\n", date, e.Session, orUnset(e.Title))
+			fmt.Fprintf(&b, t("- %s 结束学习 `%s`（位置：%s）\n"), date, e.Session, t(orUnset(e.Title)))
 		case "legacy":
-			fmt.Fprintf(&b, "- 旧记录：%s\n", strings.ReplaceAll(e.Text, "\n", "；"))
+			fmt.Fprintf(&b, t("- 旧记录：%s\n"), strings.ReplaceAll(e.Text, "\n", t("；")))
 		}
 	}
 	return b.String(), nil

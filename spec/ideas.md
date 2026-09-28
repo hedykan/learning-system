@@ -10,7 +10,7 @@
 | IDEA-004 | Claude/Codex 宿主 Hook 自动捕获对话 | deferred | 2026-09-26：继续由 Skill 保证 Agent 逐轮记录 |
 | IDEA-005 | 真实 AI Provider 分析 Session | rejected | 2026-09-26：语义分析由 Agent 完成，程序不内置模型调用 |
 | IDEA-006 | 教材版本升级后的章节位置映射 | idea | backlog |
-| IDEA-007 | 将 Git 代码项目作为 Project Source 导入并按 revision 学习 | idea | v0.2 |
+| IDEA-007 | 将 Git 代码项目作为 Project Source 导入并按 revision 学习 | accepted | v0.1.8（见 CR-2026-030） |
 | IDEA-008 | Source 验证、可恢复删除/重导入与 Session 中止 | implemented | Session 中止与位置重置已在 v0.1.1 实现；Source 验证并入 CR-2026-005；删除、归档、恢复进入 v0.1.4（见 CR-2026-001） |
 | IDEA-009 | 首次学习摸底、例子优先与术语预算 | implemented | v0.1.1（见 CR-2026-002） |
 | IDEA-010 | 证据驱动的知识沉淀、Cognitive History 与长期 Learner Model | implemented | v0.1.2（见 CR-2026-004） |
@@ -27,11 +27,15 @@
 | IDEA-021 | Windows 构建与路径兼容测试 | implemented | v0.1.5（见 CR-2026-015） |
 | IDEA-022 | 跨课程学习模式实测：用第二本教材验证 Learning Pattern | idea | 有第二本教材后 |
 | IDEA-023 | 17 个核心验证场景全部通过 | partial | v0.1.6 复验后仅场景 7 未通过 |
-| IDEA-025 | 界面语言设置：固定文字跟随学习者语言 | accepted | v0.1.7（见 CR-2026-023） |
-| IDEA-026 | 学习记录未提交到 Git 时提醒 | accepted | v0.1.7（见 CR-2026-024） |
-| IDEA-027 | 教材要点兜底：学完一节时提示补上本节概念的教材要点 | idea | v0.1.7 候选 |
-| IDEA-028 | 教材文件夹整理：去掉与教材首页重复的 book.md，隐藏运行时状态文件 | idea | v0.1.7 候选 |
+| IDEA-025 | 界面语言设置：固定文字跟随学习者语言 | implemented | v0.1.7（见 CR-2026-023） |
+| IDEA-026 | 学习记录未提交到 Git 时提醒 | implemented | v0.1.7（见 CR-2026-024） |
+| IDEA-027 | 教材要点兜底：学完一节时提示补上本节概念的教材要点 | idea | 下一版本候选 |
+| IDEA-028 | 教材文件夹整理：去掉与教材首页重复的 book.md，隐藏运行时状态文件 | idea | 下一版本候选 |
 | IDEA-024 | 自发检索提示：记录中出现对早先 Session 已学概念的使用、却没有 retrieval 事件时，checkpoint 输出提示 Agent 核对是否为自发检索 | idea | 下一版本候选 |
+| IDEA-029 | 通用定位与资料适配器接口，课程挂多份资料 | accepted | v0.1.8（见 CR-2026-025 至 027） |
+| IDEA-030 | 没有文件的资料（视频课、纸质书）与文字类格式（HTML、EPUB、DOCX 等） | accepted | v0.1.8（见 CR-2026-028、029） |
+| IDEA-031 | 网址抓取快照与 Agent 搜集资料组织课程 | accepted | v0.1.8（见 CR-2026-031、032） |
+| IDEA-032 | 对话中的数学公式用终端可读的符号 | accepted | v0.1.8（见 CR-2026-033） |
 
 ## IDEA-007 初步边界
 

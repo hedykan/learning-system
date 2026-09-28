@@ -11,7 +11,7 @@ Keep every Runtime operation backstage and follow the "Learner-facing voice" rul
 
 ## Begin
 
-1. Run `learn status --json` from the Vault.
+1. Run `learn status --json` from the Vault. Its `language` is the interface language of generated pages (`zh` or `en`). If the learner is clearly using the other supported language, run `learn config set language <zh|en>` once, silently; for any other language use `en`. Also switch when the learner asks for pages in another language.
 2. If an active session exists and the user wants to continue, resume it: find the last assistant question with `learn session turns --json` and pick up exactly there, restating it briefly if the learner has not answered it yet.
 3. If the active curriculum reports `position_verified: false`, any `uncovered` entries, or any `partial` entries, read [curriculum outline](references/curriculum-outline.md) and fix that first: confirm an outline with the learner, move the position to the right node, and ask what to do with uncovered and partly studied entries.
 4. If the active curriculum reports `baseline.state = not_assessed`, read [baseline workflow](references/baseline-workflow.md). Establish the baseline before a lesson unless the user explicitly skips it.
