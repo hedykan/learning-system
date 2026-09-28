@@ -225,3 +225,26 @@ func TestReviewDueRule(t *testing.T) {
 		t.Fatalf("R3b: %+v", got)
 	}
 }
+
+func TestKnownElsewhereQuickCheck(t *testing.T) {
+	learned := record.Record{Concepts: []record.Concept{tail}, StateUpdates: []record.StateUpdate{{ID: "u1", Concept: "tail",
+		State: "developing", Capabilities: []string{"explained"}, Summary: "能解释", Evidence: ev("t0004")}}}
+	stable := record.Record{StateUpdates: []record.StateUpdate{{ID: "u2", Concept: "tail", State: "stable",
+		Capabilities: []string{"explained", "retrieved"}, Summary: "隔天独立回忆", Evidence: ev("t0004")}},
+		Events: []record.Event{{ID: "e2", Type: "retrieval", Concept: "tail", Summary: "独立回忆", Evidence: ev("t0004")}}}
+	m := build(t, learned, stable)
+	if m.Concepts["tail"].State() != "stable" {
+		t.Fatalf("fixture state = %s", m.Concepts["tail"].State())
+	}
+	c := ctx("")
+	c.Curriculum, c.Position = "k8s", curriculum.Position{Chapter: "3"}
+	c.NextNode = &curriculum.Node{ID: "3.1", Title: "尾延迟与 SLO", Concepts: []string{"tail"}}
+	got := policy.Next(m, c)
+	if got.Action != "quick_check" || got.Rule != "R6b-known-elsewhere" || got.Node != "3.1" || !strings.Contains(got.Reason, "ddia") || got.Strategy != "retrieval_practice" {
+		t.Fatalf("quick check: %+v", got)
+	}
+	c.NextNode.Concepts = []string{"tail", "slo-budget"}
+	if got := policy.Next(m, c); got.Action == "quick_check" {
+		t.Fatalf("quick check with an unlearned concept: %+v", got)
+	}
+}

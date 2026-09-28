@@ -124,6 +124,22 @@ learn source check [curriculum] [--json]
 - `source check` 报告失效的定位，以及外部课程中没有任何资料位置的条目（`unsourced`）。
 - 文件夹资料按自然顺序读取（`ch2` 在 `ch10` 前）。
 
+## Curriculum Builder（v0.2）
+
+```bash
+learn curriculum import --goal "<学习目标>" --id <id> --title <name> [--dry-run|--yes] [--activate]
+learn curriculum proposals [id] [--all] [--json]
+learn curriculum accept <proposal> [--curriculum <id>] [--json]
+learn curriculum reject <proposal> --reason <why> [--curriculum <id>]
+learn curriculum outline history [id] [--json]
+```
+
+- 大纲 `type`：`source_aligned`（缺省）或 `synthesized`（目标课程固定为此类型）。`outline show --json` 输出 `type`。
+- 条目元数据：`why`（≤120 字）、`prerequisites`（其他条目 ID，不能是自身、祖先或后代，不能成环）、`concepts`（kebab-case 概念 ID）。
+- 目标课程的主资料种类为 `goal`：没有内容，读取返回 `unsupported`；条目只接受 `text` 定位，且不算来源。没有挂载资料的叶子条目出现在 `source check` 的 `unsourced`、`next` 的 `unsourced: true`；这些条目的概念提交 `textbook_points` 会被拒收。
+- `next --json` 新增 `blocked_by`（未完成的先修）、`pending_proposals`（待定的课程调整建议）；动作 `quick_check`（规则 R6b-known-elsewhere）表示条目涉及的概念都已在其他课程中稳定。
+- `curriculum_proposals`：`skip`、`mark_known` 两类课程都可用；`insert`、`remove`、`retitle` 只用于 synthesized。提交时按当前大纲校验；`accept` 执行后大纲保持已确认，被替换的旧大纲存入 `Curriculum/<id>/outline-history/`，决定存入 `Curriculum/<id>/proposals.yaml`。同一建议只能决定一次。
+
 ## 更多资料（v0.1.9）
 
 ```bash

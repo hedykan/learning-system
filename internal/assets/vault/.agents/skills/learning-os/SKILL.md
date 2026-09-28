@@ -25,7 +25,7 @@ The Learner Model grows only from Interpretation Records you submit and the Runt
 
 ## Import material
 
-Read [curriculum import](references/curriculum-import.md) when the user provides a textbook or course path, a video course, a paper book or a class, or wants to stop studying, remove, or restore a book. Complete a dry run before the real import, then build the outline with [curriculum outline](references/curriculum-outline.md).
+Read [curriculum import](references/curriculum-import.md) when the user provides a textbook or course path, a video course, a paper book or a class, or wants to stop studying, remove, or restore a book. Read [curriculum builder](references/curriculum-builder.md) when the learner has a learning goal but no textbook, when `learn next` returns `quick_check` or `pending_proposals`, or when the learner's words show the curriculum should change. Complete a dry run before the real import, then build the outline with [curriculum outline](references/curriculum-outline.md).
 
 ## Safety boundary
 

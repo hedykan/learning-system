@@ -57,6 +57,9 @@ func renderHome(in Inputs) string {
 			active = in.t("（正在学习）")
 		}
 		fmt.Fprintf(&b, in.t("- %s%s：%s · %s\n"), link(CurriculumIndexFile(id, in.Titles[id]), in.Titles[id]), active, progress, link(CurriculumProgressFile(id, in.Lang), in.t("进度")))
+		if n := len(in.Unsourced[id]); n > 0 {
+			fmt.Fprintf(&b, in.t("  - %d 个小节还没有原始资料，内容为 AI 综合\n"), n)
+		}
 	}
 
 	b.WriteString(in.t("\n## ② 学习\n"))
@@ -86,6 +89,9 @@ func renderHome(in Inputs) string {
 		}
 		if n := in.Next; n != nil {
 			fmt.Fprintf(&b, in.t("- 下一步：%s\n"), in.nextSentence(m, n.Action, n.Concept, n.Node, n.NodeTitle))
+			if len(n.PendingProposals) > 0 {
+				fmt.Fprintf(&b, in.t("- 有 %d 条课程调整建议等你决定\n"), len(n.PendingProposals))
+			}
 		}
 	}
 
@@ -223,6 +229,8 @@ func (in Inputs) nextSentence(m *learner.Model, action, concept, node, nodeTitle
 		return fmt.Sprintf(in.t("复习到期的「%s」"), label)
 	case "transfer_probe", "application_probe":
 		return fmt.Sprintf(in.t("把「%s」用到新的场景里"), label)
+	case "quick_check":
+		return fmt.Sprintf(in.t("快速检验已掌握的 %s %s"), node, nodeTitle)
 	case "explain_probe":
 		return fmt.Sprintf(in.t("开始学习「%s」"), label)
 	default:

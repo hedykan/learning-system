@@ -37,3 +37,18 @@ func (externalAdapter) Read(string, locator.Locator) (Content, error) {
 func (externalAdapter) Validate(_ string, loc locator.Locator) error {
 	return requireKinds("external", loc, "page", "time", "text")
 }
+
+// goalAdapter is the empty primary of a curriculum built from a learning
+// goal (CR-2026-040): its entries are read through attached resources.
+type goalAdapter struct{}
+
+func (goalAdapter) Kind() string                      { return "goal" }
+func (goalAdapter) Detect(string, fs.FileInfo) bool   { return false }
+func (goalAdapter) Capabilities() Caps                { return Caps{} }
+func (goalAdapter) Outline(string) ([]Section, error) { return nil, ErrNoStructure }
+func (goalAdapter) Read(string, locator.Locator) (Content, error) {
+	return Content{}, &Unsupported{"this curriculum was built from a learning goal and has no material of its own; read the resources attached to the entry (learn next lists them), or attach one with learn source add and learn source attach"}
+}
+func (goalAdapter) Validate(_ string, loc locator.Locator) error {
+	return requireKinds("goal", loc, "text")
+}

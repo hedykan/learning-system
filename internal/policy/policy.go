@@ -49,6 +49,13 @@ type Action struct {
 	// Resources lists where the entry to study can be read or watched,
 	// filled by the caller from the curriculum's resources (CR-2026-027).
 	Resources []curriculum.NodeResource `json:"resources,omitempty"`
+	// Unsourced is true when no resource covers the entry: what is taught
+	// there is AI synthesis (CR-2026-040).
+	Unsourced bool `json:"unsourced,omitempty"`
+	// BlockedBy lists unfinished prerequisites of the entry (CR-2026-039).
+	BlockedBy []string `json:"blocked_by,omitempty"`
+	// PendingProposals are curriculum changes waiting for the learner.
+	PendingProposals []string `json:"pending_proposals,omitempty"`
 }
 
 // QuestionRef is an open learner question shown with every recommendation.
@@ -207,6 +214,13 @@ func decide(m *learner.Model, ctx Context) Action {
 		return Action{Action: "explain_probe", Concept: id, Situation: "new_concept", CurriculumRelation: relation,
 			Rule: "R5-unobserved", Reason: i18n.F(ctx.Lang, "「%s」还没有学习证据，先引出学习者的理解", target)}
 	}
+	if n := ctx.NextNode; n != nil {
+		if known, where := KnownElsewhere(m, n.Concepts); known {
+			return Action{Action: "quick_check", Concept: n.Concepts[0], Node: n.ID, NodeTitle: n.Title, Situation: "retrieval",
+				CurriculumRelation: relation, Rule: "R6b-known-elsewhere",
+				Reason: i18n.F(ctx.Lang, "%s %s 涉及的概念已经掌握（%s），先快速检验一次，通过即可标记为已掌握", n.ID, n.Title, where)}
+		}
+	}
 	act := Action{Action: "continue_curriculum", Situation: "new_concept", CurriculumRelation: relation,
 		Rule: "R6-continue", Reason: i18n.T(ctx.Lang, "当前范围没有待修复或待验证的理解，沿教材继续")}
 	if n := ctx.NextNode; n != nil {
@@ -353,4 +367,27 @@ func chooseStrategy(m *learner.Model, situation, conceptID string) (string, []st
 		}
 	}
 	return Defaults[situation], exclusionEvidence
+}
+
+// KnownElsewhere reports whether every listed concept exists and is stable,
+// and names where they were learned (CR-2026-042).
+func KnownElsewhere(m *learner.Model, concepts []string) (bool, string) {
+	if len(concepts) == 0 {
+		return false, ""
+	}
+	var where []string
+	seen := map[string]bool{}
+	for _, id := range concepts {
+		c := m.Concepts[id]
+		if c == nil || c.State() != "stable" {
+			return false, ""
+		}
+		for _, r := range c.SourceRefs {
+			if !seen[r.Curriculum] {
+				seen[r.Curriculum] = true
+				where = append(where, r.Curriculum)
+			}
+		}
+	}
+	return true, strings.Join(where, ", ")
 }

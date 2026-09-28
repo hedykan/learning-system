@@ -234,7 +234,8 @@ func Check(root, id string) (CheckReport, error) {
 	covered := map[string]bool{}
 	for _, n := range o.Nodes {
 		if where, ok := n.Where(); ok {
-			covered[n.ID] = true
+			// A goal's own text locators are notes, not material.
+			covered[n.ID] = primary.Kind != "goal"
 			if err := primary.Validate(where); err != nil {
 				rep.Invalid = append(rep.Invalid, CheckIssue{Node: n.ID, Locator: where, Error: err.Error()})
 			}
@@ -254,7 +255,7 @@ func Check(root, id string) (CheckReport, error) {
 			rep.Invalid = append(rep.Invalid, CheckIssue{Node: a.Node, Locator: a.Locator, Error: err.Error()})
 		}
 	}
-	if primary.Caps.External {
+	if primary.Caps.External || primary.Kind == "goal" {
 		for _, n := range o.Nodes {
 			if !covered[n.ID] && !hasChildNode(o, n.ID) {
 				rep.Unsourced = append(rep.Unsourced, n.ID)
@@ -271,4 +272,22 @@ func hasChildNode(o Outline, id string) bool {
 		}
 	}
 	return false
+}
+
+// Unsourced lists the leaf entries of a goal curriculum that no resource
+// covers: what is taught there is AI synthesis (CR-2026-040).
+func Unsourced(root, id string) map[string]bool {
+	out := map[string]bool{}
+	m, err := LoadManifest(root, id)
+	if err != nil || m.Kind != "goal" {
+		return out
+	}
+	rep, err := Check(root, id)
+	if err != nil {
+		return out
+	}
+	for _, n := range rep.Unsourced {
+		out[n] = true
+	}
+	return out
 }

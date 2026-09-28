@@ -79,5 +79,6 @@ All arrays are optional, but a record must contain at least one item. Unknown fi
 - `review_results.outcome`: `recalled`, `partial`, or `forgotten`; `action_turn` is your question in this session and evidence comes after it.
 - `no_related`: concepts you checked and found unrelated to every existing concept; the end-of-session check stops asking about them until a relation is added.
 - A record may carry only concepts with textbook points or relations, or only `no_related`.
+- `curriculum_proposals`: suggested outline changes (`skip`, `mark_known`, `insert`, `remove`, `retitle`) with a kebab-case `id`, `node`, `reason` (4–200 characters) and learner evidence; `insert` and `retitle` need `title`. They change nothing until the learner agrees and you run `learn curriculum accept <id>`; see [curriculum builder](curriculum-builder.md).
 - `questions`: global kebab-case `id`, `question` of 4–120 characters, optional existing `concept`, optional `node` that exists in the confirmed outline, learner evidence required. `question_resolutions` closes a question once, with learner evidence.
 - A pattern becomes `supported` with more support than contradiction and either support from two curricula across at least two sessions, or support from at least three sessions.

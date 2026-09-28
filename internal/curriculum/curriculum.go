@@ -39,6 +39,8 @@ type Manifest struct {
 	Revisions []Revision `yaml:"revisions,omitempty" json:"revisions,omitempty"`
 	// Fetch repeats a web snapshot on refresh.
 	Fetch *FetchSpec `yaml:"fetch,omitempty" json:"fetch,omitempty"`
+	// Goal is the learning goal of a curriculum built from one (CR-2026-040).
+	Goal string `yaml:"goal,omitempty" json:"goal,omitempty"`
 }
 
 // FetchSpec is how a web snapshot was taken.
@@ -97,6 +99,8 @@ type ImportOptions struct {
 	Note     string
 	// Kind forces an adapter that is never auto-detected, e.g. "code".
 	Kind string
+	// Goal creates a synthesized curriculum from a learning goal.
+	Goal string
 	// Fetch options when SourcePath is an http(s) URL.
 	Sitemap   string
 	Prefix    string
@@ -133,6 +137,9 @@ func Import(root string, opts ImportOptions) (ImportPlan, error) {
 	}
 	if opts.External {
 		return importExternal(root, opts)
+	}
+	if strings.TrimSpace(opts.Goal) != "" {
+		return importGoal(root, opts)
 	}
 	if opts.Kind == "code" {
 		return importCode(root, opts)
@@ -213,6 +220,55 @@ func Import(root string, opts ImportOptions) (ImportPlan, error) {
 		return plan, err
 	}
 	if err := writeCurriculum(root, manifest, source); err != nil {
+		return plan, err
+	}
+	if opts.Activate {
+		if err := Activate(root, opts.ID); err != nil {
+			return plan, err
+		}
+	}
+	return plan, nil
+}
+
+// importGoal creates a synthesized curriculum from a learning goal. The
+// Agent researches it, submits an outline with topic metadata, and attaches
+// sources to its entries.
+func importGoal(root string, opts ImportOptions) (ImportPlan, error) {
+	title := strings.TrimSpace(opts.Title)
+	if title == "" {
+		return ImportPlan{}, fmt.Errorf("a curriculum from a goal needs --title")
+	}
+	if opts.SourcePath != "" || opts.External || opts.Kind != "" {
+		return ImportPlan{}, fmt.Errorf("--goal takes no path, --external or --kind")
+	}
+	goal := strings.TrimSpace(opts.Goal)
+	plan := ImportPlan{ID: opts.ID, Title: title, Kind: "goal", Mode: "none",
+		Destination: filepath.Join(root, "Sources", opts.ID), Activate: opts.Activate, DryRun: opts.DryRun}
+	if _, err := os.Stat(plan.Destination); err == nil {
+		return plan, fmt.Errorf("%w: id %s", ErrAlreadyImported, opts.ID)
+	}
+	if opts.DryRun {
+		return plan, nil
+	}
+	if !opts.Confirmed {
+		return plan, fmt.Errorf("import requires --yes after reviewing a dry run")
+	}
+	if opts.Now.IsZero() {
+		opts.Now = time.Now()
+	}
+	manifest := Manifest{Version: 1, ID: opts.ID, Title: title, Kind: "goal", Mode: "none", Goal: goal,
+		ImportedAt: opts.Now.UTC().Format(time.RFC3339)}
+	data, err := yaml.Marshal(manifest)
+	if err != nil {
+		return plan, err
+	}
+	if err := fsutil.WriteFileAtomic(filepath.Join(plan.Destination, "manifest.yaml"), data, 0o644); err != nil {
+		return plan, err
+	}
+	if err := writeCurriculum(root, manifest, ""); err != nil {
+		return plan, err
+	}
+	if err := saveOutline(root, opts.ID, Outline{Version: 2, Status: "missing", Type: Synthesized}); err != nil {
 		return plan, err
 	}
 	if opts.Activate {

@@ -444,6 +444,44 @@ func anchorConcepts(root, curriculumID string, rec *record.Record) error {
 	return nil
 }
 
+// checkProposals validates curriculum proposals against the outline as it
+// is now; decided ones are left alone (their record may be resubmitted).
+func checkProposals(root, curriculumID string, rec *record.Record) error {
+	if len(rec.CurriculumProposals) == 0 {
+		return nil
+	}
+	decided, err := curriculum.LoadDecisions(root, curriculumID)
+	if err != nil {
+		return err
+	}
+	for _, p := range rec.CurriculumProposals {
+		if _, done := decided[p.ID]; done {
+			continue
+		}
+		spec := curriculum.ProposalSpec{ID: p.ID, Action: p.Action, Node: p.Node, Title: p.Title, Why: p.Why, Prerequisites: p.Prerequisites, Reason: p.Reason}
+		if err := curriculum.CheckProposal(root, curriculumID, spec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkSourcedPoints refuses textbook points for entries no resource
+// covers: there is no text they could summarize (CR-2026-040).
+func checkSourcedPoints(root, curriculumID string, rec *record.Record) error {
+	unsourced := curriculum.Unsourced(root, curriculumID)
+	if len(unsourced) == 0 {
+		return nil
+	}
+	for _, c := range rec.Concepts {
+		if c.TextbookPoints == nil || c.SourceRef == nil || !unsourced[c.SourceRef.Node] {
+			continue
+		}
+		return fmt.Errorf("concept %s textbook_points: entry %s has no source material, so there is nothing to summarize; attach a resource first (learn source attach)", c.ID, c.SourceRef.Node)
+	}
+	return nil
+}
+
 // checkPinnedCode requires textbook points about code to name the commit
 // they were read at: records never change, while the project moves on.
 func checkPinnedCode(root, curriculumID string, rec *record.Record) error {
@@ -535,6 +573,12 @@ func submitAndRefresh(root, sessionID, kind string, rec *record.Record, now time
 		return CheckpointResult{}, err
 	}
 	if err := checkPinnedCode(root, conv.Curriculum, rec); err != nil {
+		return CheckpointResult{}, err
+	}
+	if err := checkSourcedPoints(root, conv.Curriculum, rec); err != nil {
+		return CheckpointResult{}, err
+	}
+	if err := checkProposals(root, conv.Curriculum, rec); err != nil {
 		return CheckpointResult{}, err
 	}
 	check := func(before, after *learner.Model) error { return stableGate(before, after, rec) }

@@ -26,6 +26,11 @@ type Node struct {
 	// Locator places the entry in its resource when pages do not apply
 	// (CR-2026-025); give it or pages, not both.
 	Locator *locator.Locator `yaml:"locator,omitempty" json:"locator,omitempty"`
+	// Topic metadata (CR-2026-039): why the entry is studied, entries to
+	// finish first, and the concepts it is expected to cover.
+	Why           string   `yaml:"why,omitempty" json:"why,omitempty"`
+	Prerequisites []string `yaml:"prerequisites,omitempty" json:"prerequisites,omitempty"`
+	Concepts      []string `yaml:"concepts,omitempty" json:"concepts,omitempty"`
 }
 
 // Where is the entry's position as a locator, from pages or the locator.
@@ -43,7 +48,10 @@ func (n Node) Where() (locator.Locator, bool) {
 type Outline struct {
 	Version int    `yaml:"version" json:"version"`
 	Status  string `yaml:"status" json:"status"` // missing, draft, confirmed
-	Nodes   []Node `yaml:"nodes" json:"nodes"`
+	// Type is source_aligned (the default: follows one material) or
+	// synthesized (organized from a learning goal) (CR-2026-038).
+	Type  string `yaml:"type,omitempty" json:"type,omitempty"`
+	Nodes []Node `yaml:"nodes" json:"nodes"`
 }
 
 var nodeIDPattern = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
@@ -67,7 +75,7 @@ func LoadOutline(root, id string) (Outline, error) {
 		return Outline{}, fmt.Errorf("parse outline: %w", err)
 	}
 	if len(o.Nodes) == 0 {
-		return Outline{Version: 2, Status: "missing"}, nil
+		return Outline{Version: 2, Status: "missing", Type: o.Type}, nil
 	}
 	return o, nil
 }
@@ -160,7 +168,7 @@ func (o Outline) Validate() error {
 		seen[n.ID] = n
 		prev = n.ID
 	}
-	return nil
+	return o.validateTopics()
 }
 
 // Find returns a node by ID.
@@ -200,6 +208,12 @@ func SetOutline(root, id string, data []byte, dryRun bool) (Outline, error) {
 		return Outline{}, fmt.Errorf("parse outline: %w", err)
 	}
 	in.Version, in.Status = 2, "draft"
+	if prev, err := LoadOutline(root, id); err == nil && in.Type == "" {
+		in.Type = prev.Type // an outline keeps its type unless the new one names it
+	}
+	if m, err := LoadManifest(root, id); err == nil && m.Kind == "goal" {
+		in.Type = Synthesized
+	}
 	if err := in.Validate(); err != nil {
 		return Outline{}, err
 	}
@@ -553,6 +567,7 @@ func NextNode(o Outline, statuses []NodeStatus, pos Position) (Node, bool) {
 			return s.Node, true
 		}
 	}
+	var first *Node
 	for _, s := range statuses {
 		if o.hasChildren(s.ID) || s.Status == "completed" || s.Status == "skipped" {
 			continue
@@ -560,7 +575,17 @@ func NextNode(o Outline, statuses []NodeStatus, pos Position) (Node, bool) {
 		if pos.Node != "" && lessID(s.ID, pos.Node) {
 			continue
 		}
-		return s.Node, true
+		if first == nil {
+			n := s.Node
+			first = &n
+		}
+		// Entries whose prerequisites are unfinished wait (CR-2026-039).
+		if len(BlockedBy(s.Node, statuses)) == 0 {
+			return s.Node, true
+		}
+	}
+	if first != nil {
+		return *first, true // everything left is blocked: start with the first
 	}
 	return Node{}, false
 }

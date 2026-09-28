@@ -520,6 +520,9 @@ func renderCurriculum(in Inputs, id string) string {
 	b.WriteString(frontmatter("curriculum-index", "curriculum: "+id+"\n"+tags.Lines(tags.Curriculum), m.Generation))
 	fmt.Fprintf(&b, "# %s\n\n%s", in.Titles[id], in.t(notice))
 	pos := in.Positions[id]
+	if o := in.Outlines[id]; o.TypeOf() == curriculum.Synthesized {
+		b.WriteString(in.t("> 这门课程由 Agent 根据学习目标组织，条目的顺序与来源都记录在下方；没有原始资料的条目是 AI 综合的内容。\n\n"))
+	}
 	b.WriteString(in.t("## 教材位置\n\n"))
 	fmt.Fprintf(&b, in.t("- 章节：%s\n- 小节：%s\n- 当前概念：%s\n"), in.orNone(pos.Chapter), in.orNone(pos.Section), in.orNone(pos.CurrentConcept))
 	if pos.Node != "" {
@@ -539,7 +542,21 @@ func renderCurriculum(in Inputs, id string) string {
 			b.WriteString(in.t("目录为草稿，尚未经学习者确认。\n\n"))
 		}
 		for _, s := range in.Statuses[id] {
-			fmt.Fprintf(&b, "%s- %s %s\n", strings.Repeat("  ", s.Depth-1), in.t(curriculum.StatusLabel[s.Status]), s.Label())
+			mark := ""
+			if in.Unsourced[id][s.ID] {
+				mark = in.t("（AI 综合，无原始资料）")
+			}
+			if known, _ := policy.KnownElsewhere(m, s.Concepts); known && s.Status != "completed" && s.Status != "skipped" {
+				mark += in.t("（已在其他课程掌握）")
+			}
+			fmt.Fprintf(&b, "%s- %s %s%s\n", strings.Repeat("  ", s.Depth-1), in.t(curriculum.StatusLabel[s.Status]), s.Label(), mark)
+			indent := strings.Repeat("  ", s.Depth-1)
+			if s.Why != "" {
+				fmt.Fprintf(&b, in.t("%s  - 为什么学：%s\n"), indent, s.Why)
+			}
+			if len(s.Prerequisites) > 0 {
+				fmt.Fprintf(&b, in.t("%s  - 先修：%s\n"), indent, strings.Join(s.Prerequisites, in.t("、")))
+			}
 			for _, a := range in.Resources[id].Attachments {
 				if a.Node == s.ID {
 					fmt.Fprintf(&b, in.t("%s  - 资料：%s %s\n"), strings.Repeat("  ", s.Depth-1), in.resourceTitle(a.Locator.Resource), a.Locator.Label(in.Lang))

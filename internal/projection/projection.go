@@ -38,6 +38,7 @@ type Inputs struct {
 	DetourLogs map[string][]curriculum.DetourLogEntry
 	Outlines   map[string]curriculum.Outline
 	Resources  map[string]curriculum.ResourceSet
+	Unsourced  map[string]map[string]bool // curriculum -> entries without any resource
 	Statuses   map[string][]curriculum.NodeStatus
 	Archived   map[string]bool
 	Library    []string // imported, non-archived curricula in id order
@@ -65,7 +66,7 @@ type RecentSession struct {
 func Gather(root string, m *learner.Model) (Inputs, error) {
 	in := Inputs{Model: m, Root: root, Resolver: learner.NewResolver(root), Titles: map[string]string{},
 		Positions: map[string]curriculum.Position{}, DetourLogs: map[string][]curriculum.DetourLogEntry{},
-		Outlines: map[string]curriculum.Outline{}, Resources: map[string]curriculum.ResourceSet{}, Statuses: map[string][]curriculum.NodeStatus{}, Archived: map[string]bool{}}
+		Outlines: map[string]curriculum.Outline{}, Resources: map[string]curriculum.ResourceSet{}, Unsourced: map[string]map[string]bool{}, Statuses: map[string][]curriculum.NodeStatus{}, Archived: map[string]bool{}}
 	cfg, err := config.Load(root)
 	if err != nil {
 		return in, err
@@ -129,6 +130,7 @@ func Gather(root string, m *learner.Model) (Inputs, error) {
 		if set, err := curriculum.LoadResourceSet(root, id); err == nil {
 			in.Resources[id] = set
 		}
+		in.Unsourced[id] = curriculum.Unsourced(root, id)
 		in.Statuses[id] = curriculum.Statuses(outline, entries, in.Positions[id], m.NodesWithEvidence(id))
 	}
 	recent, err := recentSessions(root, 5)
@@ -166,6 +168,17 @@ func Gather(root string, m *learner.Model) (Inputs, error) {
 		}
 		if res, err := curriculum.NodeResources(root, in.Active, node, in.Lang); err == nil && len(res) > 0 {
 			next.Resources = res
+		}
+		next.Unsourced = in.Unsourced[in.Active][node]
+		if decided, err := curriculum.LoadDecisions(root, in.Active); err == nil {
+			for _, p := range m.ProposalList(in.Active) {
+				if _, done := decided[p.ID]; !done {
+					next.PendingProposals = append(next.PendingProposals, p.ID)
+				}
+			}
+		}
+		if n, ok := in.Outlines[in.Active].Find(node); ok {
+			next.BlockedBy = curriculum.BlockedBy(n, in.Statuses[in.Active])
 		}
 		in.Next = &next
 	}

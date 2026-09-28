@@ -87,6 +87,7 @@ func init() {
 	Register(codeAdapter{})
 	Register(webAdapter{})
 	Register(externalAdapter{})
+	Register(goalAdapter{})
 }
 
 // Detect picks the adapter for a file or folder.

@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.1.9"
+const Version = "0.2.0"
 
 type App struct {
 	Out      io.Writer
@@ -343,6 +343,7 @@ func (a *App) curriculumCommand(explicitVault *string) *cobra.Command {
 	cmd.AddCommand(a.curriculumLifecycleCommands(explicitVault)...)
 	cmd.AddCommand(a.curriculumMarkCommand(explicitVault, "complete", "completed", "Mark an outline entry as completed"))
 	cmd.AddCommand(a.curriculumMarkCommand(explicitVault, "skip", "skipped", "Mark an outline entry as deliberately skipped"))
+	cmd.AddCommand(a.proposalCommands(explicitVault)...)
 	return cmd
 }
 
@@ -403,7 +404,7 @@ func (a *App) curriculumListCommand(explicitVault *string) *cobra.Command {
 }
 
 func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
-	var id, title, url, note, kind, sitemap, prefix string
+	var id, title, url, note, kind, sitemap, prefix, goal string
 	var maxPages int
 	var copyMode, linkMode, activate, dryRun, confirmed, asJSON, external bool
 	cmd := &cobra.Command{
@@ -412,7 +413,7 @@ func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
 			if copyMode && linkMode {
 				return fmt.Errorf("--copy and --link are mutually exclusive")
 			}
-			if len(args) == 0 && !external {
+			if len(args) == 0 && !external && goal == "" {
 				return fmt.Errorf("give the material's path, or --external for a video course, paper book or class")
 			}
 			path := ""
@@ -428,7 +429,7 @@ func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
 				mode = "link"
 			}
 			plan, err := curriculum.Import(root, curriculum.ImportOptions{
-				SourcePath: path, External: external, URL: url, Note: note, Kind: kind, Sitemap: sitemap, Prefix: prefix, MaxPages: maxPages, ID: id, Title: title, Mode: mode, Activate: activate,
+				SourcePath: path, External: external, URL: url, Note: note, Kind: kind, Goal: goal, Sitemap: sitemap, Prefix: prefix, MaxPages: maxPages, ID: id, Title: title, Mode: mode, Activate: activate,
 				DryRun: dryRun, Confirmed: confirmed, Now: a.Now(),
 			})
 			if err != nil {
@@ -462,6 +463,7 @@ func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
 	cmd.Flags().StringVar(&url, "url", "", "where the external material is (e.g. a playlist)")
 	cmd.Flags().StringVar(&note, "note", "", "publication details of the external material")
 	cmd.Flags().StringVar(&kind, "kind", "", "force a kind that is never detected: code (a Git project, linked and read at a commit)")
+	cmd.Flags().StringVar(&goal, "goal", "", "build a curriculum from a learning goal instead of a material (needs --title)")
 	addFetchFlags(cmd, &sitemap, &prefix, &maxPages)
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate and print the import plan without writing")
 	cmd.Flags().BoolVar(&confirmed, "yes", false, "confirm the import plan")
@@ -1186,7 +1188,7 @@ func (a *App) curriculumOutlineCommand(explicitVault *string) *cobra.Command {
 			}
 			statuses := curriculum.Statuses(o, entries, pos, m.NodesWithEvidence(id))
 			if asJSON {
-				return writeJSON(cmd.OutOrStdout(), map[string]any{"curriculum": id, "status": o.Status, "position_verified": curriculum.PositionVerified(o, pos), "nodes": statuses})
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"curriculum": id, "status": o.Status, "type": o.TypeOf(), "position_verified": curriculum.PositionVerified(o, pos), "nodes": statuses})
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Outline: %s\n", o.Status)
 			for _, s := range statuses {
@@ -1254,7 +1256,28 @@ func (a *App) curriculumOutlineCommand(explicitVault *string) *cobra.Command {
 	confirm.Flags().BoolVar(&confirmJSON, "json", false, "output JSON")
 	show := &cobra.Command{Use: "show [id]", Short: "Show the outline with completion status", Args: cobra.MaximumNArgs(1), RunE: cmd.RunE}
 	show.Flags().BoolVar(&asJSON, "json", false, "output JSON")
-	cmd.AddCommand(show, set, confirm)
+	history := &cobra.Command{
+		Use: "history [id]", Short: "List earlier outlines replaced by accepted proposals", Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, id, err := curriculumArg(*explicitVault, args)
+			if err != nil {
+				return err
+			}
+			h, err := curriculum.OutlineHistory(root, id)
+			if err != nil {
+				return err
+			}
+			if asJSON {
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"curriculum": id, "history": h})
+			}
+			for _, e := range h {
+				fmt.Fprintf(cmd.OutOrStdout(), "v%d %s %s: %s (%d entries)\n", e.Version, e.At, e.Proposal, e.Reason, len(e.Outline.Nodes))
+			}
+			return nil
+		},
+	}
+	history.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	cmd.AddCommand(show, set, confirm, history)
 	return cmd
 }
 

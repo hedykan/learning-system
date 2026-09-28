@@ -34,11 +34,11 @@
 | IDEA-024 | 自发检索提示：记录中出现对早先 Session 已学概念的使用、却没有 retrieval 事件时，checkpoint 输出提示 Agent 核对是否为自发检索 | idea | 下一版本候选 |
 | IDEA-029 | 通用定位与资料适配器接口，课程挂多份资料 | implemented | v0.1.8（见 CR-2026-025 至 027） |
 | IDEA-030 | 没有文件的资料（视频课、纸质书）与文字类格式（HTML、EPUB、DOCX 等） | implemented | 外部资料 v0.1.8（CR-2026-028）；文字类格式 v0.1.9（CR-2026-029） |
-| IDEA-031 | 网址抓取快照与 Agent 搜集资料组织课程 | partial | 网址快照 v0.1.9（CR-2026-031）；组织课程 v0.2（CR-2026-032） |
+| IDEA-031 | 网址抓取快照与 Agent 搜集资料组织课程 | implemented | 网址快照 v0.1.9（CR-2026-031）；组织课程 v0.2（CR-2026-032） |
 | IDEA-032 | 对话中的数学公式用终端可读的符号 | implemented | v0.1.8（见 CR-2026-033） |
 | IDEA-033 | 学习流程简化为三段：资料搜集 → 学习 → 巩固 | implemented | v0.1.8（见 CR-2026-034） |
 | IDEA-034 | Obsidian 图谱整理：按层打标签、证据链接收敛、关系类型与单向链接 | implemented | v0.1.8（见 CR-2026-035 至 037） |
-| IDEA-035 | Curriculum Builder：Source-aligned 与 Synthesized 课程、Topic 先修与来源、有证据的课程调整、跨课程复用已学概念（见 [proposals/curriculum-builder.md](./proposals/curriculum-builder.md)） | idea | v0.2（将重写 CR-2026-032） |
+| IDEA-035 | Curriculum Builder：Source-aligned 与 Synthesized 课程、Topic 先修与来源、有证据的课程调整、跨课程复用已学概念（见 [proposals/curriculum-builder.md](./proposals/curriculum-builder.md)） | implemented | v0.2（见 CR-2026-038 至 042） |
 
 ## IDEA-007 初步边界
 

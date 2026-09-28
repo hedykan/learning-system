@@ -33,6 +33,16 @@ var en = map[string]string{
 	"「%s」（%s · %s）":     "\"%s\" (%s · %s)",
 	"  - 「%s」（%s）\n":    "  - \"%s\" (%s)\n",
 
+	// Curriculum Builder (v0.2).
+	"（AI 综合，无原始资料）": " (AI synthesis, no source material)", "%s  - 为什么学：%s\n": "%s  - Why: %s\n", "%s  - 先修：%s\n": "%s  - Prerequisites: %s\n",
+	"> 这门课程由 Agent 根据学习目标组织，条目的顺序与来源都记录在下方；没有原始资料的条目是 AI 综合的内容。\n\n": "> The Agent organized this curriculum from a learning goal; the order and sources of its entries are recorded below. Entries without source material are AI synthesis.\n\n",
+	"  - %d 个小节还没有原始资料，内容为 AI 综合\n":                                  "  - %d entries have no source material yet; their content is AI synthesis\n",
+
+	"- 有 %d 条课程调整建议等你决定\n": "- %d curriculum change proposals are waiting for your decision\n",
+
+	"%s %s 涉及的概念已经掌握（%s），先快速检验一次，通过即可标记为已掌握": "the concepts of %s %s are already stable (%s); check them quickly and mark the entry as known if they hold",
+	"快速检验已掌握的 %s %s": "quickly check %s %s, which you already know", "（已在其他课程掌握）": " (already mastered elsewhere)",
+
 	// Resources (CR-2026-027).
 	"%s  - 资料：%s %s\n": "%s  - Resource: %s %s\n", "\n## 资料\n\n": "\n## Resources\n\n", "- %s（主资料）\n": "- %s (primary)\n",
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.2.0 — 2026-09-28
+
+Curriculum Builder：课程本身成为可构建、有来源、会随学习者演化的对象。
+
+- 课程类型：`source_aligned`（跟随一份资料）与 `synthesized`（从学习目标组织），类型决定课程能怎样调整。
+- 从学习目标建课：`learn curriculum import --goal "<目标>"`；Agent 研究方向、提交带“为什么学”、先修与概念的大纲，再给每个条目挂上可靠资料；没有资料的条目明确标为 AI 综合，不能提交教材要点。
+- 先修：大纲条目的先修必须存在且无环；`learn next` 只推荐先修已完成的条目。
+- 有证据的课程调整：解读记录中的 `curriculum_proposals`（跳过、已掌握、插入、删除、改名），经学习者同意后 `learn curriculum accept` 才生效；被替换的大纲保留在版本历史中。
+- 跨课程复用：条目涉及的概念若在其他课程中已稳定，`learn next` 建议快速检验（`quick_check`）而不是从头讲。
+
 ## v0.1.9 — 2026-09-28
 
 - 更多资料格式：EPUB（按书内目录生成草稿，拒绝 DRM 版本）、HTML、Word、Jupyter、LaTeX、reStructuredText、AsciiDoc、Org，以及混合这些格式的文件夹；都可以用 `learn source read` 按标题锚点或章节读取原文。

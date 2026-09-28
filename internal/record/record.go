@@ -165,6 +165,9 @@ type Record struct {
 	ReviewResults       []ReviewResult       `json:"review_results,omitempty"`
 	NoRelated           []string             `json:"no_related,omitempty"`
 	Questions           []Question           `json:"questions,omitempty"`
+	// CurriculumProposals suggest changing the outline, with learner
+	// evidence; they apply only after the learner agrees (CR-2026-041).
+	CurriculumProposals []CurriculumProposal `json:"curriculum_proposals,omitempty"`
 	QuestionResolutions []QuestionResolution `json:"question_resolutions,omitempty"`
 	Retractions         []Retraction         `json:"retractions,omitempty"`
 	ProgressDecision    *ProgressDecision    `json:"progress_decision,omitempty"`
@@ -197,6 +200,18 @@ func Parse(data []byte) (*Record, error) {
 	return &rec, nil
 }
 
+// CurriculumProposal is one suggested outline change.
+type CurriculumProposal struct {
+	ID            string     `json:"id"`
+	Action        string     `json:"action"` // skip, mark_known, insert, remove, retitle
+	Node          string     `json:"node"`
+	Title         string     `json:"title,omitempty"`
+	Why           string     `json:"why,omitempty"`
+	Prerequisites []string   `json:"prerequisites,omitempty"`
+	Reason        string     `json:"reason"`
+	Evidence      []Evidence `json:"evidence"`
+}
+
 // Empty reports whether a record carries no content. Concepts alone count
 // only when they carry textbook points.
 func (r *Record) Empty() bool {
@@ -206,7 +221,7 @@ func (r *Record) Empty() bool {
 		}
 	}
 	return len(r.Events)+len(r.CognitiveChanges)+len(r.StateUpdates)+len(r.StrategyAttempts)+
-		len(r.PatternObservations)+len(r.ReviewResults)+len(r.NoRelated)+len(r.Questions)+len(r.QuestionResolutions)+len(r.Retractions) == 0 && r.ProgressDecision == nil
+		len(r.PatternObservations)+len(r.ReviewResults)+len(r.NoRelated)+len(r.Questions)+len(r.CurriculumProposals)+len(r.QuestionResolutions)+len(r.Retractions) == 0 && r.ProgressDecision == nil
 }
 
 // Hash returns the canonical content hash of a record.

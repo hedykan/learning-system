@@ -101,6 +101,35 @@ func (r RelatedEntry) Kind() string {
 	return r.Type
 }
 
+// Proposal is one suggested outline change with its learner evidence.
+type Proposal struct {
+	ID            string        `json:"id"`
+	Curriculum    string        `json:"curriculum"`
+	Session       string        `json:"session"`
+	At            string        `json:"at"`
+	Action        string        `json:"action"`
+	Node          string        `json:"node"`
+	Title         string        `json:"title,omitempty"`
+	Why           string        `json:"why,omitempty"`
+	Prerequisites []string      `json:"prerequisites,omitempty"`
+	Reason        string        `json:"reason"`
+	Evidence      []EvidenceRef `json:"evidence"`
+}
+
+// ProposalActions lists the outline changes a record may suggest.
+var ProposalActions = set("skip", "mark_known", "insert", "remove", "retitle")
+
+// ProposalList returns a curriculum's proposals in id order.
+func (m *Model) ProposalList(curriculum string) []*Proposal {
+	var out []*Proposal
+	for _, id := range sortedKeys(m.Proposals) {
+		if p := m.Proposals[id]; curriculum == "" || p.Curriculum == curriculum {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 // QuestionItem is a learner-generated key question with its lifecycle.
 type QuestionItem struct {
 	ID         string          `json:"id"`
@@ -238,6 +267,9 @@ type Model struct {
 	Reviews     []*Review                `json:"reviews"`
 	Questions   map[string]*QuestionItem `json:"questions"`
 	Retractions []*Retraction            `json:"retractions"`
+	// Proposals are suggested outline changes by id (CR-2026-041); whether
+	// the learner accepted them is curriculum state, not evidence.
+	Proposals map[string]*Proposal `json:"curriculum_proposals,omitempty"`
 
 	order    int
 	items    map[string]any
@@ -248,8 +280,8 @@ func New() *Model {
 	return &Model{
 		Sessions: map[string]*SessionInfo{}, Concepts: map[string]*Concept{}, Patterns: map[string]*Pattern{},
 		Events: []*Event{}, Changes: []*Change{}, Attempts: []*Attempt{}, Progress: []*Progress{}, Retractions: []*Retraction{}, Reviews: []*Review{},
-		Questions: map[string]*QuestionItem{},
-		items:     map[string]any{}, itemJSON: map[string]string{},
+		Questions: map[string]*QuestionItem{}, Proposals: map[string]*Proposal{},
+		items: map[string]any{}, itemJSON: map[string]string{},
 	}
 }
 
