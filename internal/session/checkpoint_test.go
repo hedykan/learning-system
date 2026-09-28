@@ -85,7 +85,7 @@ func TestCheckpointEndAndRebuild(t *testing.T) {
 	}
 	conceptPath := filepath.Join(root, "Concepts", "尾延迟.md")
 	concept := read(t, conceptPath)
-	for _, want := range []string{"形成中", "「不能只看平均值」", "#^t0004", "平均延迟低即好 → 触发：慢请求的绝对数量 → 要同时看尾部延迟", "分片扇出时尾延迟如何放大"} {
+	for _, want := range []string{"形成中", "「不能只看平均值」", "（t0004）", "平均延迟低即好 → 触发：慢请求的绝对数量 → 要同时看尾部延迟", "分片扇出时尾延迟如何放大"} {
 		if !strings.Contains(concept, want) {
 			t.Fatalf("concept missing %q:\n%s", want, concept)
 		}

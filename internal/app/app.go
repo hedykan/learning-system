@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.1.7"
+const Version = "0.1.8"
 
 type App struct {
 	Out      io.Writer
@@ -70,6 +70,7 @@ func (a *App) RootCommand() *cobra.Command {
 	root.AddCommand(a.commitCommand(&explicitVault))
 	root.AddCommand(a.reviewCommand(&explicitVault))
 	root.AddCommand(a.configCommand(&explicitVault))
+	root.AddCommand(a.sourceCommand(&explicitVault))
 	_ = verbose
 	return root
 }
@@ -201,6 +202,7 @@ type statusOutput struct {
 	GitUncommitted  int                         `json:"git_uncommitted"`
 	GitAutoCommit   string                      `json:"git_auto_commit"`
 	Language        string                      `json:"language"`
+	NodeResources   []curriculum.NodeResource   `json:"node_resources"`
 	LastSession     string                      `json:"last_session,omitempty"`
 	Projections     string                      `json:"projections"`
 	Git             string                      `json:"git"`
@@ -265,6 +267,12 @@ func (a *App) statusCommand(explicitVault *string) *cobra.Command {
 				out.GitUncommitted = n
 			}
 			out.Language = i18n.Normalize(cfg.Language)
+			out.NodeResources = []curriculum.NodeResource{}
+			if out.Position != nil && cfg.Curriculum.Active != "" {
+				if res, err := curriculum.NodeResources(root, cfg.Curriculum.Active, out.Position.Node, out.Language); err == nil {
+					out.NodeResources = res
+				}
+			}
 			envs, err := record.LoadAll(root)
 			if err != nil {
 				return err
@@ -395,13 +403,20 @@ func (a *App) curriculumListCommand(explicitVault *string) *cobra.Command {
 }
 
 func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
-	var id, title string
-	var copyMode, linkMode, activate, dryRun, confirmed, asJSON bool
+	var id, title, url, note string
+	var copyMode, linkMode, activate, dryRun, confirmed, asJSON, external bool
 	cmd := &cobra.Command{
-		Use: "import <path>", Short: "Import learning material", Args: cobra.ExactArgs(1),
+		Use: "import <path> | --external --title <name>", Short: "Import learning material, or register material without a file", Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if copyMode && linkMode {
 				return fmt.Errorf("--copy and --link are mutually exclusive")
+			}
+			if len(args) == 0 && !external {
+				return fmt.Errorf("give the material's path, or --external for a video course, paper book or class")
+			}
+			path := ""
+			if len(args) == 1 {
+				path = args[0]
 			}
 			root, err := resolveVault(*explicitVault)
 			if err != nil {
@@ -412,7 +427,7 @@ func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
 				mode = "link"
 			}
 			plan, err := curriculum.Import(root, curriculum.ImportOptions{
-				SourcePath: args[0], ID: id, Title: title, Mode: mode, Activate: activate,
+				SourcePath: path, External: external, URL: url, Note: note, ID: id, Title: title, Mode: mode, Activate: activate,
 				DryRun: dryRun, Confirmed: confirmed, Now: a.Now(),
 			})
 			if err != nil {
@@ -442,6 +457,9 @@ func (a *App) curriculumImportCommand(explicitVault *string) *cobra.Command {
 	cmd.Flags().BoolVar(&copyMode, "copy", false, "copy source into the Vault (default)")
 	cmd.Flags().BoolVar(&linkMode, "link", false, "link to source outside the Vault")
 	cmd.Flags().BoolVar(&activate, "activate", false, "make this the active curriculum")
+	cmd.Flags().BoolVar(&external, "external", false, "material without a file: a video course, paper book or class")
+	cmd.Flags().StringVar(&url, "url", "", "where the external material is (e.g. a playlist)")
+	cmd.Flags().StringVar(&note, "note", "", "publication details of the external material")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "validate and print the import plan without writing")
 	cmd.Flags().BoolVar(&confirmed, "yes", false, "confirm the import plan")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
@@ -1554,8 +1572,8 @@ func (a *App) nextCommand(explicitVault *string) *cobra.Command {
 			if asJSON {
 				return writeJSON(cmd.OutOrStdout(), next)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Action: %s\nConcept: %s\nStrategy: %s\nRelation: %s\nReason: %s (%s)\nHistory used: %t\n",
-				next.Action, valueOrNone(next.Concept), valueOrNone(next.Strategy), next.CurriculumRelation, next.Reason, next.Rule, next.HistoryUsed)
+			fmt.Fprintf(cmd.OutOrStdout(), "Stage: %s\nAction: %s\nConcept: %s\nStrategy: %s\nRelation: %s\nReason: %s (%s)\nHistory used: %t\n",
+				next.Stage, next.Action, valueOrNone(next.Concept), valueOrNone(next.Strategy), next.CurriculumRelation, next.Reason, next.Rule, next.HistoryUsed)
 			return nil
 		},
 	}

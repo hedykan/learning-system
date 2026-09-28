@@ -221,7 +221,7 @@ func TestReviewDueRule(t *testing.T) {
 		t.Fatalf("due on the learning day: %+v", got)
 	}
 	c.Today = "2026-10-03"
-	if got := policy.Next(m, c); got.Rule != "R3b-review-due" || got.Action != "review_due" || got.Strategy != "retrieval_practice" {
+	if got := policy.Next(m, c); got.Rule != "R3b-review-due" || got.Action != "review_due" || got.Strategy != "retrieval_practice" || got.Stage != "consolidate" {
 		t.Fatalf("R3b: %+v", got)
 	}
 }

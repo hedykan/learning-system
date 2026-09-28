@@ -1,7 +1,7 @@
 ---
 id: CR-2026-028
 title: "没有文件的资料：视频、纸质书、线下课程"
-status: accepted
+status: implemented
 target_version: v0.1.8
 created: 2026-09-28
 ---
@@ -42,3 +42,5 @@ created: 2026-09-28
 ## 决策
 
 2026-09-28 接受，排入 v0.1.8。
+
+2026-09-28 实现：`learn curriculum import --external` 与 `learn source add --external`；外部资料只接受 page、time、text 定位，读取返回 `unsupported` 与原因；`source check` 报告外部课程中没有任何定位或挂载的小节；Skill 新增 `references/resources.md`。

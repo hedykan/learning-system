@@ -1,7 +1,7 @@
 ---
 id: CR-2026-033
 title: "数学公式的对话写法"
-status: accepted
+status: implemented
 target_version: v0.1.8
 created: 2026-09-28
 ---
@@ -28,3 +28,5 @@ Codex、Claude 的终端不渲染 LaTeX，`\forall \varepsilon > 0, \exists N` �
 ## 决策
 
 2026-09-28 接受，排入 v0.1.8。
+
+2026-09-28 实现：写入 Vault `AGENTS.md` 的学习者可见话术规则。

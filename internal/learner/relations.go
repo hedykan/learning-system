@@ -75,3 +75,57 @@ func (m *Model) UnlinkedIn(session, curriculum string) (missing []string, candid
 	}
 	return missing, candidates
 }
+
+// PrerequisiteCycle returns one cycle of prerequisite relations, or nil.
+func (m *Model) PrerequisiteCycle() []string {
+	const (
+		unseen = iota
+		active
+		done
+	)
+	state := map[string]int{}
+	var path []string
+	var visit func(id string) []string
+	visit = func(id string) []string {
+		state[id] = active
+		path = append(path, id)
+		c := m.Concepts[id]
+		deps := []string{}
+		for _, r := range c.Related {
+			if r.Type == "prerequisite" && r.Direction == "out" {
+				deps = append(deps, r.Concept)
+			}
+		}
+		sort.Strings(deps)
+		for _, d := range deps {
+			switch state[d] {
+			case active:
+				for i, p := range path {
+					if p == d {
+						return append(append([]string{}, path[i:]...), d)
+					}
+				}
+			case unseen:
+				if cycle := visit(d); cycle != nil {
+					return cycle
+				}
+			}
+		}
+		path = path[:len(path)-1]
+		state[id] = done
+		return nil
+	}
+	ids := make([]string, 0, len(m.Concepts))
+	for id := range m.Concepts {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		if state[id] == unseen {
+			if cycle := visit(id); cycle != nil {
+				return cycle
+			}
+		}
+	}
+	return nil
+}

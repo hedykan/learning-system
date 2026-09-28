@@ -1,12 +1,10 @@
 package curriculum
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +12,9 @@ import (
 	"github.com/hedykan/learning-system/internal/config"
 	"github.com/hedykan/learning-system/internal/fsutil"
 	"github.com/hedykan/learning-system/internal/i18n"
+	"github.com/hedykan/learning-system/internal/locator"
+	"github.com/hedykan/learning-system/internal/source"
+	"github.com/hedykan/learning-system/internal/tags"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,6 +23,20 @@ type Node struct {
 	ID    string `yaml:"id" json:"id"`
 	Title string `yaml:"title" json:"title"`
 	Pages []int  `yaml:"pages,omitempty" json:"pages,omitempty"`
+	// Locator places the entry in its resource when pages do not apply
+	// (CR-2026-025); give it or pages, not both.
+	Locator *locator.Locator `yaml:"locator,omitempty" json:"locator,omitempty"`
+}
+
+// Where is the entry's position as a locator, from pages or the locator.
+func (n Node) Where() (locator.Locator, bool) {
+	switch {
+	case n.Locator != nil:
+		return *n.Locator, true
+	case len(n.Pages) == 2:
+		return locator.FromPages(n.Pages), true
+	}
+	return locator.Locator{}, false
 }
 
 // Outline is the confirmed or draft table of contents of a curriculum.
@@ -117,6 +132,19 @@ func (o Outline) Validate() error {
 		if parentID(n.ID) != "" && !hasParent {
 			return fmt.Errorf("%s: parent %s must appear first", where, parentID(n.ID))
 		}
+		if n.Locator != nil {
+			if len(n.Pages) != 0 {
+				return fmt.Errorf("%s: give pages or locator, not both", where)
+			}
+			if err := n.Locator.Validate(); err != nil {
+				return fmt.Errorf("%s: %w", where, err)
+			}
+			if outer, ok := parent.Where(); hasParent && ok {
+				if inside, comparable := n.Locator.Within(outer); comparable && !inside {
+					return fmt.Errorf("%s: locator %s falls outside parent %s", where, n.Locator.Value, parent.ID)
+				}
+			}
+		}
 		if len(n.Pages) != 0 {
 			if len(n.Pages) != 2 || n.Pages[0] < 1 || n.Pages[0] > n.Pages[1] {
 				return fmt.Errorf("%s: pages must be [start, end] with 1 <= start <= end", where)
@@ -175,6 +203,21 @@ func SetOutline(root, id string, data []byte, dryRun bool) (Outline, error) {
 	if err := in.Validate(); err != nil {
 		return Outline{}, err
 	}
+	// Entry locators point into the curriculum's own material; the adapter
+	// knows which kinds make sense (pages for PDF, anchors for Markdown...).
+	if primary, err := Resolve(root, id); err == nil {
+		for _, n := range in.Nodes {
+			if n.Locator == nil {
+				continue
+			}
+			if n.Locator.Resource != "" && n.Locator.Resource != id {
+				return Outline{}, fmt.Errorf("outline entry %s: locators point into the curriculum's own material; attach other resources with `learn source attach`", n.ID)
+			}
+			if err := primary.Validate(*n.Locator); err != nil {
+				return Outline{}, fmt.Errorf("outline entry %s: %w", n.ID, err)
+			}
+		}
+	}
 	if dryRun {
 		return in, nil
 	}
@@ -203,68 +246,51 @@ func ConfirmOutline(root, id string) (Outline, error) {
 	return o, RenderProgress(root, id)
 }
 
-var headingPattern = regexp.MustCompile(`^(#{1,2})\s+(.+?)\s*#*\s*$`)
-
-// MarkdownOutline builds a draft outline from level-1 and level-2 headings.
-// A directory contributes its .md files in name order.
-func MarkdownOutline(source string) ([]Node, error) {
-	info, err := os.Stat(source)
+// MarkdownOutline derives draft outline entries from level 1 and 2 headings
+// of a Markdown file or folder; other formats yield no entries.
+func MarkdownOutline(path string) ([]Node, error) {
+	info, err := os.Stat(path)
 	if err != nil {
 		return nil, err
 	}
-	files := []string{source}
-	if info.IsDir() {
-		files = nil
-		err := filepath.WalkDir(source, func(p string, d os.DirEntry, err error) error {
-			if err == nil && !d.IsDir() && strings.EqualFold(filepath.Ext(p), ".md") {
-				files = append(files, p)
-			}
-			return err
-		})
-		if err != nil {
-			return nil, err
-		}
-		sort.Strings(files)
-	} else if !strings.EqualFold(filepath.Ext(source), ".md") {
+	a, err := source.Detect(path, info)
+	if err != nil || !a.Capabilities().Structured {
 		return nil, nil
 	}
+	sections, err := a.Outline(path)
+	if err == source.ErrNoStructure {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return NodesFromSections(sections, filepath.Base(path)), nil
+}
+
+// NodesFromSections numbers headings as chapters (level 1) and sections
+// (level 2); sections before any chapter go under a chapter named after
+// their file.
+func NodesFromSections(sections []source.Section, fallback string) []Node {
 	var nodes []Node
 	chapter, section := 0, 0
-	for _, f := range files {
-		fh, err := os.Open(f)
-		if err != nil {
-			return nil, err
+	for _, s := range sections {
+		if s.Level == 1 {
+			chapter, section = chapter+1, 0
+			nodes = append(nodes, Node{ID: strconv.Itoa(chapter), Title: s.Title})
+			continue
 		}
-		scanner := bufio.NewScanner(fh)
-		inFence := false
-		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.HasPrefix(strings.TrimSpace(line), "```") {
-				inFence = !inFence
-				continue
+		if chapter == 0 {
+			chapter = 1
+			name := fallback
+			if s.File != "" {
+				name = filepath.Base(s.File)
 			}
-			m := headingPattern.FindStringSubmatch(line)
-			if inFence || m == nil {
-				continue
-			}
-			if len(m[1]) == 1 {
-				chapter, section = chapter+1, 0
-				nodes = append(nodes, Node{ID: strconv.Itoa(chapter), Title: m[2]})
-			} else {
-				if chapter == 0 {
-					chapter = 1
-					nodes = append(nodes, Node{ID: "1", Title: filepath.Base(f)})
-				}
-				section++
-				nodes = append(nodes, Node{ID: fmt.Sprintf("%d.%d", chapter, section), Title: m[2]})
-			}
+			nodes = append(nodes, Node{ID: "1", Title: name})
 		}
-		fh.Close()
-		if err := scanner.Err(); err != nil {
-			return nil, err
-		}
+		section++
+		nodes = append(nodes, Node{ID: fmt.Sprintf("%d.%d", chapter, section), Title: s.Title})
 	}
-	return nodes, nil
+	return nodes
 }
 
 // ProgressEntry is one append-only curriculum progress event.
@@ -599,7 +625,7 @@ func ProgressMarkdown(root, id string, touched map[string]bool, lang string) (st
 		title = m.Title
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "---\ngenerated_by: learn\ncurriculum: %s\n---\n\n%s%s\n\n", id, t("# 学习进度 — "), title)
+	fmt.Fprintf(&b, "---\ngenerated_by: learn\ncurriculum: %s\n%s---\n\n%s%s\n\n", id, tags.Lines(tags.Progress), t("# 学习进度 — "), title)
 	b.WriteString(t("> 由 Learning OS 根据目录与完成记录生成。教材进度与理解程度相互独立。\n\n## 目录\n\n"))
 	if o.Status == "missing" {
 		b.WriteString(t("尚未建立目录。\n"))

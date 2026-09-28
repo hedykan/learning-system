@@ -10,7 +10,9 @@ import (
 	"github.com/hedykan/learning-system/internal/i18n"
 
 	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/locator"
 	"github.com/hedykan/learning-system/internal/policy"
+	"github.com/hedykan/learning-system/internal/tags"
 )
 
 var reviewLabel = map[string]string{"recalled": "想起", "partial": "部分想起", "forgotten": "忘记"}
@@ -46,6 +48,51 @@ func (in Inputs) evidenceLink(e learner.EvidenceRef) string {
 	return fmt.Sprintf("[[%s|%s · %s]]", target, when, e.Turn)
 }
 
+// pointsSource says where textbook points were read: "原书第 42–45 页" for
+// pages, the locator label otherwise.
+func (in Inputs) pointsSource(l locator.Locator) string {
+	if l.Kind == "page" {
+		return fmt.Sprintf(in.t("原书%s"), l.Label(in.Lang))
+	}
+	return fmt.Sprintf(in.t("%s "), l.Label(in.Lang))
+}
+
+// plainQuotes lists quotes with their turn but no link; knowledge notes
+// link to evidence only once per session (CR-2026-036).
+func (in Inputs) plainQuotes(list []learner.EvidenceRef) string {
+	parts := make([]string, 0, len(list))
+	for _, e := range list {
+		parts = append(parts, fmt.Sprintf(in.t("「%s」（%s · %s）"), e.Quote, in.when(e), e.Turn))
+	}
+	return strings.Join(parts, in.t("；"))
+}
+
+// when is the local time of an evidence turn, or its session start.
+func (in Inputs) when(e learner.EvidenceRef) string {
+	if t, err := in.Resolver.Turn(e.Session, e.Turn); err == nil {
+		if ts, err := time.Parse(time.RFC3339Nano, t.Timestamp); err == nil {
+			return ts.Local().Format("2006-01-02 15:04")
+		}
+	}
+	return sessionLabel(e.Session)
+}
+
+// evidenceGroups renders quotes grouped by session, with one link per
+// session to the conversation at its first quoted turn.
+func (in Inputs) evidenceGroups(quotes []learner.EvidenceRef) string {
+	if len(quotes) == 0 {
+		return in.t("暂无。\n")
+	}
+	var b strings.Builder
+	for i, q := range quotes {
+		if i == 0 || quotes[i-1].Session != q.Session {
+			fmt.Fprintf(&b, "- %s\n", in.evidenceLink(q))
+		}
+		fmt.Fprintf(&b, in.t("  - 「%s」（%s）\n"), q.Quote, q.Turn)
+	}
+	return b.String()
+}
+
 func (in Inputs) quotes(list []learner.EvidenceRef) string {
 	parts := make([]string, 0, len(list))
 	for _, e := range list {
@@ -76,7 +123,7 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 	for _, a := range append(append([]string{}, c.Aliases...), c.ID) {
 		fmt.Fprintf(&extra, "  - %q\n", a)
 	}
-	extra.WriteString("tags:\n")
+	extra.WriteString("tags:\n  - " + tags.Concept + "\n")
 	fmt.Fprintf(&extra, "  - learning/state/%s\n", c.State())
 	seenCurr := map[string]bool{}
 	for _, r := range c.SourceRefs {
@@ -84,6 +131,10 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 			seenCurr[r.Curriculum] = true
 			fmt.Fprintf(&extra, "  - learning/curriculum/%s\n", r.Curriculum)
 		}
+	}
+	local, cross := splitRelations(m, c)
+	if len(cross) > 0 {
+		extra.WriteString("  - learning/cross-curriculum\n")
 	}
 	b.WriteString(frontmatter("concept", extra.String(), m.Generation))
 	fmt.Fprintf(&b, "# %s\n\n%s", c.Label, in.t(notice))
@@ -98,16 +149,12 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 	}
 	for _, r := range c.SourceRefs {
 		loc := strings.Trim(strings.TrimSpace(strings.Join([]string{r.Chapter, r.Section}, " · ")), " ·")
-		if in.Archived[r.Curriculum] {
-			fmt.Fprintf(&b, in.t("- 教材来源：%s %s\n"), in.Titles[r.Curriculum], loc)
-			continue
-		}
-		fmt.Fprintf(&b, in.t("- 教材来源：%s %s\n"), link(CurriculumIndexFile(r.Curriculum, in.Titles[r.Curriculum]), in.Titles[r.Curriculum]), loc)
+		fmt.Fprintf(&b, in.t("- 教材来源：%s %s\n"), in.Titles[r.Curriculum], loc)
 	}
 
 	if n := len(c.Points); n > 0 {
 		cur := c.Points[n-1]
-		fmt.Fprintf(&b, in.t("\n## 教材要点\n\n> AI 根据原书第 %d–%d 页概括，未经学习者核对。\n\n"), cur.Pages[0], cur.Pages[1])
+		fmt.Fprintf(&b, in.t("\n## 教材要点\n\n> AI 根据%s概括，未经学习者核对。\n\n"), in.pointsSource(cur.Locator))
 		for _, p := range cur.Points {
 			fmt.Fprintf(&b, "- %s\n", p)
 		}
@@ -115,21 +162,13 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 			b.WriteString(in.t("\n此前版本：\n\n"))
 			for i := n - 2; i >= 0; i-- {
 				old := c.Points[i]
-				fmt.Fprintf(&b, in.t("- %s（第 %d–%d 页）：%s\n"), sessionLabel(old.Session), old.Pages[0], old.Pages[1], strings.Join(old.Points, "；"))
+				fmt.Fprintf(&b, in.t("- %s（%s）：%s\n"), sessionLabel(old.Session), old.Locator.Label(in.Lang), strings.Join(old.Points, in.t("；")))
 			}
 		}
 	}
 
-	if len(c.Related) > 0 {
-		b.WriteString(in.t("\n## 相关概念\n\n"))
-		for _, r := range c.Related {
-			line := "- " + conceptLink(m, r.Concept)
-			if r.Note != "" {
-				line += in.t("：") + r.Note
-			}
-			b.WriteString(line + "\n")
-		}
-	}
+	in.renderRelations(&b, in.t("\n## 相关概念\n\n"), local, false)
+	in.renderRelations(&b, in.t("\n## 与其他教材的联系\n\n"), cross, true)
 
 	b.WriteString(in.t("\n## 学习者原话\n\n"))
 	seen := map[string]bool{}
@@ -166,12 +205,7 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 		}
 		return quotes[i].Turn < quotes[j].Turn
 	})
-	if len(quotes) == 0 {
-		b.WriteString(in.t("暂无。\n"))
-	}
-	for _, q := range quotes {
-		fmt.Fprintf(&b, in.t("- 「%s」%s\n"), q.Quote, in.evidenceLink(q))
-	}
+	b.WriteString(in.evidenceGroups(quotes))
 
 	b.WriteString(in.t("\n## 当前理解（AI 解释）\n\n"))
 	if cur := c.Current(); cur != nil {
@@ -197,7 +231,7 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 		if ev.Superseded != "" {
 			status = in.t("已撤回")
 		}
-		fmt.Fprintf(&b, in.t("- 误解（%s）：%s；证据 %s\n"), status, ev.Summary, in.quotes(ev.Evidence))
+		fmt.Fprintf(&b, in.t("- 误解（%s）：%s；证据 %s\n"), status, ev.Summary, in.plainQuotes(ev.Evidence))
 		wrote = true
 	}
 	for _, ch := range m.ChangesFor(c.ID) {
@@ -205,7 +239,7 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 		if ch.Superseded != "" {
 			mark = in.t("（已撤回）")
 		}
-		fmt.Fprintf(&b, in.t("- 认知变化%s：%s → 触发：%s → %s\n  - 之前：%s\n  - 之后：%s\n"), mark, ch.OldModel, ch.Trigger, ch.NewModel, in.quotes(ch.OldEvidence), in.quotes(ch.NewEvidence))
+		fmt.Fprintf(&b, in.t("- 认知变化%s：%s → 触发：%s → %s\n  - 之前：%s\n  - 之后：%s\n"), mark, ch.OldModel, ch.Trigger, ch.NewModel, in.plainQuotes(ch.OldEvidence), in.plainQuotes(ch.NewEvidence))
 		wrote = true
 	}
 	if !wrote {
@@ -251,7 +285,7 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 		fmt.Fprintf(&b, in.t("- 下次复习：%s（第 %d 档，间隔 %d 天）\n- 已复习：%d 次\n"), s.Due, s.Level+1, s.Interval, s.Reviews)
 		for _, r := range m.Reviews {
 			if r.Concept == c.ID {
-				fmt.Fprintf(&b, in.t("  - %s：%s；证据 %s\n"), sessionLabel(r.Session), in.t(reviewLabel[r.Outcome]), in.quotes(r.Evidence))
+				fmt.Fprintf(&b, in.t("  - %s：%s；证据 %s\n"), sessionLabel(r.Session), in.t(reviewLabel[r.Outcome]), in.plainQuotes(r.Evidence))
 			}
 		}
 	} else {
@@ -277,7 +311,7 @@ func renderConcept(in Inputs, c *learner.Concept) string {
 			if h.Superseded != "" {
 				note = h.Superseded
 			}
-			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", sessionLink(h.Session), in.state(h.State), strings.Join(h.Capabilities, in.t("、")), cell(h.Summary), cell(note))
+			fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n", sessionLabel(h.Session), in.state(h.State), strings.Join(h.Capabilities, in.t("、")), cell(h.Summary), cell(note))
 		}
 	}
 	return b.String()
@@ -314,20 +348,20 @@ func questionLink(m *learner.Model, q *learner.QuestionItem) string {
 func renderQuestion(in Inputs, q *learner.QuestionItem) string {
 	m := in.Model
 	var b strings.Builder
-	extra := fmt.Sprintf("question: %s\nstatus: %s\naliases:\n  - %q\ntags:\n  - learning/question/%s\n  - learning/curriculum/%s\n", q.ID, q.Status, q.ID, q.Status, q.Curriculum)
+	extra := fmt.Sprintf("question: %s\nstatus: %s\naliases:\n  - %q\ntags:\n  - %s\n  - learning/question/%s\n  - learning/curriculum/%s\n", q.ID, q.Status, q.ID, tags.Question, q.Status, q.Curriculum)
 	b.WriteString(frontmatter("question", extra, m.Generation))
 	fmt.Fprintf(&b, "# %s\n\n%s", q.Question, in.t(notice))
-	fmt.Fprintf(&b, in.t("- 状态：%s\n- 提出于：%s\n"), in.t(questionStatus[q.Status]), sessionLink(q.Session))
+	fmt.Fprintf(&b, in.t("- 状态：%s\n- 提出于：%s\n"), in.t(questionStatus[q.Status]), sessionLabel(q.Session))
 	if q.Concept != "" {
 		fmt.Fprintf(&b, in.t("- 相关概念：%s\n"), conceptLink(m, q.Concept))
 	}
 	if q.Node != "" {
 		fmt.Fprintf(&b, in.t("- 预计在目录条目 %s 回答\n"), q.Node)
 	}
-	fmt.Fprintf(&b, in.t("\n## 学习者原话\n\n%s\n"), in.quotes(q.Evidence))
+	b.WriteString(in.t("\n## 学习者原话\n\n") + in.evidenceGroups(q.Evidence))
 	b.WriteString(in.t("\n## 解答\n\n"))
 	if r := q.Resolution; r != nil {
-		fmt.Fprintf(&b, in.t("%s\n\n- 解决于：%s\n- 证据：%s\n"), r.Summary, sessionLink(r.Session), in.quotes(r.Evidence))
+		fmt.Fprintf(&b, in.t("%s\n\n- 解决于：%s\n- 证据：%s\n"), r.Summary, sessionLabel(r.Session), in.plainQuotes(r.Evidence))
 	} else {
 		b.WriteString(in.t("尚未解决。学习位置到达相关小节或概念时，Agent 会先回来回答它。\n"))
 	}
@@ -362,7 +396,7 @@ func (in Inputs) renderNext(b *strings.Builder, m *learner.Model, next *policy.A
 func renderOverview(in Inputs) string {
 	m := in.Model
 	var b strings.Builder
-	b.WriteString(frontmatter("learner-overview", "", m.Generation))
+	b.WriteString(frontmatter("learner-overview", tags.Lines(tags.Overview), m.Generation))
 	b.WriteString(in.t("# 学习者总览\n\n") + in.t(notice))
 
 	b.WriteString(in.t("## 概念状态\n\n| 概念 | 状态 | 能力证据 | 教材 |\n| --- | --- | --- | --- |\n"))
@@ -483,7 +517,7 @@ func renderOverview(in Inputs) string {
 func renderCurriculum(in Inputs, id string) string {
 	m := in.Model
 	var b strings.Builder
-	b.WriteString(frontmatter("curriculum-index", "curriculum: "+id+"\n", m.Generation))
+	b.WriteString(frontmatter("curriculum-index", "curriculum: "+id+"\n"+tags.Lines(tags.Curriculum), m.Generation))
 	fmt.Fprintf(&b, "# %s\n\n%s", in.Titles[id], in.t(notice))
 	pos := in.Positions[id]
 	b.WriteString(in.t("## 教材位置\n\n"))
@@ -506,6 +540,23 @@ func renderCurriculum(in Inputs, id string) string {
 		}
 		for _, s := range in.Statuses[id] {
 			fmt.Fprintf(&b, "%s- %s %s\n", strings.Repeat("  ", s.Depth-1), in.t(curriculum.StatusLabel[s.Status]), s.Label())
+			for _, a := range in.Resources[id].Attachments {
+				if a.Node == s.ID {
+					fmt.Fprintf(&b, in.t("%s  - 资料：%s %s\n"), strings.Repeat("  ", s.Depth-1), in.resourceTitle(a.Locator.Resource), a.Locator.Label(in.Lang))
+				}
+			}
+		}
+	}
+
+	if set := in.Resources[id]; len(set.Resources) > 0 {
+		b.WriteString(in.t("\n## 资料\n\n"))
+		fmt.Fprintf(&b, in.t("- %s（主资料）\n"), in.Titles[id])
+		for _, r := range set.Resources {
+			line := "- " + in.resourceTitle(r.ID)
+			if res, err := curriculum.LoadResource(in.Root, r.ID); err == nil && res.URL != "" {
+				line += " · " + res.URL
+			}
+			b.WriteString(line + "\n")
 		}
 	}
 
@@ -623,6 +674,17 @@ func renderSessionAnalysis(in Inputs, id string) string {
 		}
 	}
 	return b.String()
+}
+
+// resourceTitle names a resource for learners, falling back to its id.
+func (in Inputs) resourceTitle(id string) string {
+	if t, ok := in.Titles[id]; ok {
+		return t
+	}
+	if r, err := curriculum.LoadResource(in.Root, id); err == nil {
+		return r.Title
+	}
+	return id
 }
 
 func (in Inputs) orNone(s string) string {

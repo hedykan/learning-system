@@ -6,6 +6,8 @@ package learner
 import (
 	"sort"
 	"strings"
+
+	"github.com/hedykan/learning-system/internal/locator"
 )
 
 var (
@@ -72,16 +74,31 @@ type Concept struct {
 // PointsEntry is one version of a concept's textbook points; the last one
 // is current and earlier ones remain as history.
 type PointsEntry struct {
-	Session string   `json:"session"`
-	At      string   `json:"at"`
-	Pages   []int    `json:"pages"`
-	Points  []string `json:"points"`
+	Session string          `json:"session"`
+	At      string          `json:"at"`
+	Locator locator.Locator `json:"locator"`
+	Points  []string        `json:"points"`
 }
 
-// RelatedEntry is one undirected concept relation, stored on both ends.
+// RelatedEntry is one concept relation, stored on both ends. Type is empty
+// for a plain related link. Directed types are "out" on the declaring
+// concept and "in" on the other end.
 type RelatedEntry struct {
-	Concept string `json:"concept"`
-	Note    string `json:"note,omitempty"`
+	Concept   string `json:"concept"`
+	Type      string `json:"type,omitempty"`
+	Direction string `json:"direction,omitempty"`
+	Note      string `json:"note,omitempty"`
+}
+
+// RelationTypes lists the allowed relation types; true marks directed ones.
+var RelationTypes = map[string]bool{"related": false, "contrast": false, "prerequisite": true, "part_of": true, "applies_to": true}
+
+// Kind is the relation type, "related" when unset.
+func (r RelatedEntry) Kind() string {
+	if r.Type == "" {
+		return "related"
+	}
+	return r.Type
 }
 
 // QuestionItem is a learner-generated key question with its lifecycle.

@@ -1,7 +1,7 @@
 ---
 id: CR-2026-025
 title: "通用定位：用 locator 取代页码"
-status: accepted
+status: implemented
 target_version: v0.1.8
 created: 2026-09-28
 ---
@@ -61,3 +61,5 @@ created: 2026-09-28
 ## 决策
 
 2026-09-28 接受，排入 v0.1.8，作为本版第一项实现。
+
+2026-09-28 实现：`internal/locator`；教材要点与目录节点接受 `locator`，旧 `pages` 换算为 page 定位；page、time、file 可比较范围，anchor、chapter、text 只校验格式（anchor 由 Markdown 适配器校验存在性）。页码的学习者可见文字与 v0.1.7 逐字一致。

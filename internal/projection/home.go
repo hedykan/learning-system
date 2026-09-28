@@ -8,13 +8,15 @@ import (
 
 	"github.com/hedykan/learning-system/internal/curriculum"
 	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/tags"
 )
 
-// renderHome renders the Vault's README.md home page.
+// renderHome renders the Vault's README.md home page, organized by the
+// three learning stages: collect material, learn, consolidate (CR-2026-034).
 func renderHome(in Inputs) string {
 	m := in.Model
 	var b strings.Builder
-	b.WriteString(frontmatter("home", "", m.Generation))
+	b.WriteString(frontmatter("home", tags.Lines(tags.Home), m.Generation))
 	b.WriteString(in.t("# 我的学习\n\n> 本页由 Learning OS 生成，是这个学习库的首页；只有「手写笔记」区域会原样保留。\n\n"))
 
 	if g := in.Git; g != nil {
@@ -27,66 +29,8 @@ func renderHome(in Inputs) string {
 		b.WriteString(in.t("常见原因是 Agent 的沙箱禁止写入 `.git`。在沙箱之外的终端里进入本目录，运行 `learn commit` 即可保存。\n\n"))
 	}
 
-	b.WriteString(in.t("## 正在学习\n\n"))
-	switch {
-	case len(in.Library) == 0:
-		b.WriteString(in.t("还没有导入教材。在本目录启动 Codex 或 Claude，告诉它教材文件的位置即可导入。\n"))
-	case in.Active == "":
-		b.WriteString(in.t("当前没有激活的教材。告诉 Agent 你想学哪一本。\n"))
-	default:
-		pos := in.Positions[in.Active]
-		fmt.Fprintf(&b, in.t("- 教材：%s\n"), link(CurriculumIndexFile(in.Active, in.Titles[in.Active]), in.Titles[in.Active]))
-		where := strings.Trim(strings.Join([]string{pos.Chapter, pos.Section}, " / "), " /")
-		if where == "" {
-			where = in.t("尚未设定")
-		}
-		fmt.Fprintf(&b, in.t("- 学到：%s\n"), where)
-		if pos.CurrentConcept != "" {
-			fmt.Fprintf(&b, in.t("- 当前概念：%s\n"), pos.CurrentConcept)
-		}
-		switch in.Outlines[in.Active].Status {
-		case "confirmed":
-		case "draft":
-			b.WriteString(in.t("- 目录：草稿，等待你确认\n"))
-		default:
-			b.WriteString(in.t("- 目录：尚未建立，学习位置还不能和原书核对\n"))
-		}
-		if n := in.Next; n != nil {
-			fmt.Fprintf(&b, in.t("- 下一步：%s\n"), in.nextSentence(m, n.Action, n.Concept, n.Node, n.NodeTitle))
-		}
-	}
-
-	fmt.Fprintf(&b, in.t("\n## 今天该复习（%s）\n\n"), in.Today)
-	var due []learner.Schedule
-	var next *learner.Schedule
-	for _, s := range m.Schedules() {
-		s := s
-		if s.Due <= in.Today {
-			due = append(due, s)
-		} else if next == nil {
-			next = &s
-		}
-	}
-	switch {
-	case len(due) > 0:
-		for _, s := range due {
-			fmt.Fprintf(&b, in.t("- %s（%s 到期，第 %d 档）\n"), conceptLink(m, s.Concept), s.Due, s.Level+1)
-		}
-		b.WriteString(in.t("\n说“继续学习”，会先安排这些复习。\n"))
-	case next != nil:
-		fmt.Fprintf(&b, in.t("今天没有到期的复习。下一次：%s，%s。\n"), next.Due, conceptLink(m, next.Concept))
-	default:
-		b.WriteString(in.t("还没有需要复习的概念。\n"))
-	}
-
-	if open := m.OpenQuestions(""); len(open) > 0 {
-		b.WriteString(in.t("\n## 我提出的问题\n\n"))
-		for _, q := range open {
-			fmt.Fprintf(&b, "- %s\n", questionLink(m, q))
-		}
-	}
-
-	b.WriteString(in.t("\n## 我的教材\n\n"))
+	b.WriteString(in.t("## ① 资料\n"))
+	b.WriteString(in.t("\n### 我的教材\n\n"))
 	if len(in.Library) == 0 {
 		b.WriteString(in.t("暂无。\n"))
 	}
@@ -115,21 +59,44 @@ func renderHome(in Inputs) string {
 		fmt.Fprintf(&b, in.t("- %s%s：%s · %s\n"), link(CurriculumIndexFile(id, in.Titles[id]), in.Titles[id]), active, progress, link(CurriculumProgressFile(id, in.Lang), in.t("进度")))
 	}
 
-	b.WriteString(in.t("\n## 学习者总览\n\n"))
-	if m.Empty() {
-		b.WriteString(in.t("还没有学习记录。学完第一个概念后，这里会显示各概念的理解状态。\n"))
-	} else {
-		counts := map[string]int{}
-		misconceptions := 0
-		for _, c := range m.ConceptList() {
-			counts[c.State()]++
-			misconceptions += len(m.UnresolvedMisconceptions(c.ID))
+	b.WriteString(in.t("\n## ② 学习\n"))
+	b.WriteString(in.t("\n### 正在学习\n\n"))
+	switch {
+	case len(in.Library) == 0:
+		b.WriteString(in.t("还没有导入教材。在本目录启动 Codex 或 Claude，告诉它教材文件的位置即可导入。\n"))
+	case in.Active == "":
+		b.WriteString(in.t("当前没有激活的教材。告诉 Agent 你想学哪一本。\n"))
+	default:
+		pos := in.Positions[in.Active]
+		fmt.Fprintf(&b, in.t("- 教材：%s\n"), link(CurriculumIndexFile(in.Active, in.Titles[in.Active]), in.Titles[in.Active]))
+		where := strings.Trim(strings.Join([]string{pos.Chapter, pos.Section}, " / "), " /")
+		if where == "" {
+			where = in.t("尚未设定")
 		}
-		fmt.Fprintf(&b, in.t("- %s\n- 概念：形成中 %d 个，脆弱 %d 个，稳定 %d 个\n- 待修正的误解：%d 个\n"), link(OverviewFile(in.Lang), in.t("查看学习者总览")),
-			counts["developing"], counts["fragile"], counts["stable"], misconceptions)
+		fmt.Fprintf(&b, in.t("- 学到：%s\n"), where)
+		if pos.CurrentConcept != "" {
+			fmt.Fprintf(&b, in.t("- 当前概念：%s\n"), pos.CurrentConcept)
+		}
+		switch in.Outlines[in.Active].Status {
+		case "confirmed":
+		case "draft":
+			b.WriteString(in.t("- 目录：草稿，等待你确认\n"))
+		default:
+			b.WriteString(in.t("- 目录：尚未建立，学习位置还不能和原书核对\n"))
+		}
+		if n := in.Next; n != nil {
+			fmt.Fprintf(&b, in.t("- 下一步：%s\n"), in.nextSentence(m, n.Action, n.Concept, n.Node, n.NodeTitle))
+		}
 	}
 
-	b.WriteString(in.t("\n## 最近学习\n\n"))
+	if open := m.OpenQuestions(""); len(open) > 0 {
+		b.WriteString(in.t("\n### 我提出的问题\n\n"))
+		for _, q := range open {
+			fmt.Fprintf(&b, "- %s\n", questionLink(m, q))
+		}
+	}
+
+	b.WriteString(in.t("\n### 最近学习\n\n"))
 	if len(in.Recent) == 0 {
 		b.WriteString(in.t("暂无。\n"))
 	}
@@ -150,7 +117,45 @@ func renderHome(in Inputs) string {
 		fmt.Fprintf(&b, "- [[%s|%s]] %s · %s\n", target, sessionLabel(r.ID), kind, title)
 	}
 
-	b.WriteString(in.t("\n## 最近变化的概念\n\n"))
+	b.WriteString(in.t("\n## ③ 巩固\n"))
+	fmt.Fprintf(&b, in.t("\n### 今天该复习（%s）\n\n"), in.Today)
+	var due []learner.Schedule
+	var next *learner.Schedule
+	for _, s := range m.Schedules() {
+		s := s
+		if s.Due <= in.Today {
+			due = append(due, s)
+		} else if next == nil {
+			next = &s
+		}
+	}
+	switch {
+	case len(due) > 0:
+		for _, s := range due {
+			fmt.Fprintf(&b, in.t("- %s（%s 到期，第 %d 档）\n"), conceptLink(m, s.Concept), s.Due, s.Level+1)
+		}
+		b.WriteString(in.t("\n说“继续学习”，会先安排这些复习。\n"))
+	case next != nil:
+		fmt.Fprintf(&b, in.t("今天没有到期的复习。下一次：%s，%s。\n"), next.Due, conceptLink(m, next.Concept))
+	default:
+		b.WriteString(in.t("还没有需要复习的概念。\n"))
+	}
+
+	b.WriteString(in.t("\n### 学习者总览\n\n"))
+	if m.Empty() {
+		b.WriteString(in.t("还没有学习记录。学完第一个概念后，这里会显示各概念的理解状态。\n"))
+	} else {
+		counts := map[string]int{}
+		misconceptions := 0
+		for _, c := range m.ConceptList() {
+			counts[c.State()]++
+			misconceptions += len(m.UnresolvedMisconceptions(c.ID))
+		}
+		fmt.Fprintf(&b, in.t("- %s\n- 概念：形成中 %d 个，脆弱 %d 个，稳定 %d 个\n- 待修正的误解：%d 个\n"), link(OverviewFile(in.Lang), in.t("查看学习者总览")),
+			counts["developing"], counts["fragile"], counts["stable"], misconceptions)
+	}
+
+	b.WriteString(in.t("\n### 最近变化的概念\n\n"))
 	type change struct {
 		concept *learner.Concept
 		entry   *learner.StateEntry
@@ -178,6 +183,14 @@ func renderHome(in Inputs) string {
 	b.WriteString(in.t("- 在这个目录启动 Codex 或 Claude，说“继续学习”。\n"))
 	b.WriteString(in.t("- 想学新教材时，告诉它文件路径；它会先和你核对目录。\n"))
 	b.WriteString(in.t("- 在任何笔记的「手写笔记」区写下自己的想法，重建时不会被覆盖。\n"))
+	b.WriteString(in.t("\n### 在 Obsidian 里看知识图谱\n\n"))
+	b.WriteString(in.t("先在图谱设置的「筛选」中关闭「标签」，否则每个标签都会变成一个节点。常用筛选：\n\n"))
+	b.WriteString(in.t("| 想看 | 筛选 |\n| --- | --- |\n"))
+	fmt.Fprintf(&b, in.t("| 知识和你的手写笔记（推荐） | `%s` |\n"), "-tag:#learning/evidence -tag:#learning/process -tag:#learning/nav -path:Sources")
+	fmt.Fprintf(&b, in.t("| 只看知识 | `%s` |\n"), "tag:#learning/knowledge")
+	fmt.Fprintf(&b, in.t("| 只看证据（原始对话） | `%s` |\n"), "tag:#learning/evidence")
+	fmt.Fprintf(&b, in.t("| 只看学习过程 | `%s` |\n"), "tag:#learning/process")
+	fmt.Fprintf(&b, in.t("| 全部生成的页面 | `%s` |\n"), "tag:#learning")
 	return b.String()
 }
 

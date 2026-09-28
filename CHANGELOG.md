@@ -1,7 +1,16 @@
 # Changelog
 
-## 未发布
+## v0.1.8 — 2026-09-28
 
+- 三段学习流程：资料搜集 → 学习 → 巩固。`learn next` 输出 `stage`，Vault 首页按三段组织。
+- Obsidian 图谱整理：每篇生成文档带固定的英文层级标签（`learning/knowledge`、`evidence`、`process`、`nav`），可用 `tag:#learning/...` 筛选；新学习库自带只显示知识与手写笔记的默认图谱配置（已有配置不动）；`agent update` 为旧原始对话补标签，对话内容不变。
+- 知识笔记的证据链接收敛为每个 Session 一个；概念笔记不再链接学习记录与教材首页。
+- 概念关系类型：先修、组成、应用、易混、相关；有方向的关系只在依赖方写链接，图谱显示箭头；先修不能成环；跨教材的联系单独列出并加标签。
+- 通用定位：教材要点与目录条目可用页码、锚点、章节、文件行号、视频时间点或自由文本定位；页码写法与以前完全一致。
+- 资料接口：`learn source add/list/outline/read/attach/detach/check`；Markdown 可按标题锚点读取原文；文件夹教材按自然顺序（ch2 在 ch10 前）生成目录。
+- 一门课程可以挂多份资料，例如教材加视频课；`learn next` 与 `status` 列出当前小节的资料。
+- 没有文件的资料：`learn curriculum import --external` 支持视频课、纸质书、线下课程。
+- 话术：对话里的数学公式用终端可读的符号，不输出 LaTeX 源码。
 - 发布流程：推送版本标签时 GitHub Actions 自动测试并打包 macOS（x64、arm64）、Windows（x86、x64、arm64）与 Linux（x86、x64、arm64、armv7；AppImage 与 tar.gz），上传到 Release；可手动补发旧版本。
 - README：仓库已公开，删除私有仓库的拉取配置，新增下载二进制的安装方式。
 

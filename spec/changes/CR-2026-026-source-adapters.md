@@ -1,7 +1,7 @@
 ---
 id: CR-2026-026
 title: "资料适配器与 learn source 命令"
-status: accepted
+status: implemented
 target_version: v0.1.8
 created: 2026-09-28
 ---
@@ -85,3 +85,5 @@ HTML、EPUB 等见 CR-2026-029，代码项目见 CR-2026-030。
 ## 决策
 
 2026-09-28 接受，排入 v0.1.8。
+
+2026-09-28 实现：`internal/source`，适配器 markdown、directory、text、pdf、external；命令 `learn source add/list/outline/read/check`。与原设计的差异：导入（复制与哈希）保持通用实现，不放进适配器接口；读取失败的“不支持”以 `status: unsupported` 与原因返回。

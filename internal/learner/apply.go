@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/hedykan/learning-system/internal/conversation"
+	"github.com/hedykan/learning-system/internal/locator"
 	"github.com/hedykan/learning-system/internal/record"
 )
 
@@ -177,13 +178,14 @@ func (a *applier) concepts() error {
 			existing.Aliases = append(existing.Aliases, alias)
 		}
 		if tp := c.TextbookPoints; tp != nil {
-			if err := validatePoints(c.ID, tp); err != nil {
+			loc, err := PointsLocator(c.ID, tp)
+			if err != nil {
 				return err
 			}
 			last := len(existing.Points) - 1
-			if last < 0 || !samePoints(existing.Points[last], tp) {
+			if last < 0 || !samePoints(existing.Points[last], loc, tp) {
 				existing.Points = append(existing.Points, &PointsEntry{Session: a.env.Session, At: a.env.SubmittedAt,
-					Pages: append([]int(nil), tp.Pages...), Points: append([]string(nil), tp.Points...)})
+					Locator: loc, Points: append([]string(nil), tp.Points...)})
 			}
 		}
 		if c.SourceRef != nil {
@@ -200,10 +202,27 @@ func (a *applier) concepts() error {
 	return nil
 }
 
-func validatePoints(id string, tp *record.TextbookPoints) error {
-	if len(tp.Pages) != 2 || tp.Pages[0] < 1 || tp.Pages[0] > tp.Pages[1] {
-		return fmt.Errorf("concept %s textbook_points.pages must be [start, end] with 1 <= start <= end", id)
+// PointsLocator validates textbook points and returns where they come
+// from: the locator, or the legacy pages converted to a page locator.
+func PointsLocator(id string, tp *record.TextbookPoints) (locator.Locator, error) {
+	var loc locator.Locator
+	switch {
+	case tp.Locator != nil && len(tp.Pages) > 0:
+		return loc, fmt.Errorf("concept %s textbook_points: give locator or pages, not both", id)
+	case tp.Locator != nil:
+		loc = *tp.Locator
+		if err := loc.Validate(); err != nil {
+			return loc, fmt.Errorf("concept %s textbook_points: %w", id, err)
+		}
+	case len(tp.Pages) != 2 || tp.Pages[0] < 1 || tp.Pages[0] > tp.Pages[1]:
+		return loc, fmt.Errorf("concept %s textbook_points.pages must be [start, end] with 1 <= start <= end", id)
+	default:
+		loc = locator.FromPages(tp.Pages)
 	}
+	return loc, validatePoints(id, tp)
+}
+
+func validatePoints(id string, tp *record.TextbookPoints) error {
 	if len(tp.Points) < 1 || len(tp.Points) > 5 {
 		return fmt.Errorf("concept %s textbook_points needs 1-5 points", id)
 	}
@@ -215,14 +234,9 @@ func validatePoints(id string, tp *record.TextbookPoints) error {
 	return nil
 }
 
-func samePoints(e *PointsEntry, tp *record.TextbookPoints) bool {
-	if len(e.Pages) != len(tp.Pages) || len(e.Points) != len(tp.Points) {
+func samePoints(e *PointsEntry, loc locator.Locator, tp *record.TextbookPoints) bool {
+	if e.Locator != loc || len(e.Points) != len(tp.Points) {
 		return false
-	}
-	for i := range e.Pages {
-		if e.Pages[i] != tp.Pages[i] {
-			return false
-		}
 	}
 	for i := range e.Points {
 		if e.Points[i] != tp.Points[i] {
@@ -533,6 +547,7 @@ func (a *applier) gate(what string, c *Concept, state string, caps map[string]bo
 
 // relations runs after every concept of the record is declared.
 func (a *applier) relations() error {
+	stated := map[[2]string]bool{} // pairs already set by this record
 	for _, c := range a.rec.Concepts {
 		for _, r := range c.Related {
 			what := fmt.Sprintf("concept %s related %s", c.ID, r.Concept)
@@ -545,15 +560,48 @@ func (a *applier) relations() error {
 			if n := utf8.RuneCountInString(r.Note); n > 40 {
 				return fmt.Errorf("%s: note must be at most 40 characters", what)
 			}
-			from, to := a.m.Concepts[c.ID], a.m.Concepts[r.Concept]
-			if hasRelation(from, to.ID) {
+			kind := r.Type
+			if kind == "" {
+				kind = "related"
+			}
+			directed, ok := RelationTypes[kind]
+			if !ok {
+				return fmt.Errorf("%s: unsupported type %q (use related, contrast, prerequisite, part_of or applies_to)", what, r.Type)
+			}
+			stored := kind
+			if stored == "related" {
+				stored = ""
+			}
+			out, in := "", ""
+			if directed {
+				out, in = "out", "in"
+			}
+			// A later record restates the relation, replacing type and note;
+			// within one record the first statement wins.
+			pair := [2]string{min(c.ID, r.Concept), max(c.ID, r.Concept)}
+			if stated[pair] {
 				continue
 			}
-			from.Related = append(from.Related, RelatedEntry{Concept: to.ID, Note: r.Note})
-			to.Related = append(to.Related, RelatedEntry{Concept: from.ID, Note: r.Note})
+			stated[pair] = true
+			from, to := a.m.Concepts[c.ID], a.m.Concepts[r.Concept]
+			setRelation(from, RelatedEntry{Concept: to.ID, Type: stored, Direction: out, Note: r.Note})
+			setRelation(to, RelatedEntry{Concept: from.ID, Type: stored, Direction: in, Note: r.Note})
 		}
 	}
+	if cycle := a.m.PrerequisiteCycle(); cycle != nil {
+		return fmt.Errorf("prerequisite relations form a cycle: %s", strings.Join(cycle, " → "))
+	}
 	return nil
+}
+
+func setRelation(c *Concept, e RelatedEntry) {
+	for i, r := range c.Related {
+		if r.Concept == e.Concept {
+			c.Related[i] = e
+			return
+		}
+	}
+	c.Related = append(c.Related, e)
 }
 
 // noRelated records that the Agent checked a concept and found no related
@@ -566,15 +614,6 @@ func (a *applier) noRelated() error {
 		a.m.Concepts[id].NoRelated = true
 	}
 	return nil
-}
-
-func hasRelation(c *Concept, other string) bool {
-	for _, r := range c.Related {
-		if r.Concept == other {
-			return true
-		}
-	}
-	return false
 }
 
 // questions records new key questions, then resolutions.

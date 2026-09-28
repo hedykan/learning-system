@@ -1,7 +1,7 @@
 ---
 id: CR-2026-034
 title: "学习流程简化为三段：资料搜集 → 学习 → 巩固"
-status: accepted
+status: implemented
 target_version: v0.1.8
 created: 2026-09-28
 ---
@@ -40,3 +40,5 @@ created: 2026-09-28
 ## 决策
 
 2026-09-28 接受，排入 v0.1.8。
+
+2026-09-28 实现：`learn next` 输出 `stage`；首页按“① 资料、② 学习、③ 巩固”三段组织；README 与 `spec/product.md` 以三段循环为主图。

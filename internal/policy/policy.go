@@ -24,11 +24,16 @@ type Context struct {
 	Today string
 	// Lang is the interface language of Reason texts (CR-2026-023).
 	Lang string
+	// OutlineStatus is the active outline's status: confirmed, draft or missing.
+	OutlineStatus string
 }
 
 // Action is one Next Best Learning Action.
 type Action struct {
-	Action             string   `json:"action"`
+	Action string `json:"action"`
+	// Stage is the learning stage the action belongs to: collect, learn or
+	// consolidate (CR-2026-034).
+	Stage              string   `json:"stage"`
 	Concept            string   `json:"concept,omitempty"`
 	Node               string   `json:"node,omitempty"`
 	NodeTitle          string   `json:"node_title,omitempty"`
@@ -41,6 +46,9 @@ type Action struct {
 	HistoryUsed        bool     `json:"history_used"`
 	// OpenQuestions lists up to three open learner questions (CR-2026-020).
 	OpenQuestions []QuestionRef `json:"open_questions,omitempty"`
+	// Resources lists where the entry to study can be read or watched,
+	// filled by the caller from the curriculum's resources (CR-2026-027).
+	Resources []curriculum.NodeResource `json:"resources,omitempty"`
 }
 
 // QuestionRef is an open learner question shown with every recommendation.
@@ -82,7 +90,23 @@ func Next(m *learner.Model, ctx Context) Action {
 			act.HistoryUsed = true
 		}
 	}
+	act.Stage = stage(act, ctx)
 	return act
+}
+
+// stage maps an action to the three learning stages by fixed rules; it never
+// changes which action is chosen.
+func stage(act Action, ctx Context) string {
+	switch {
+	case act.Action == "review_due" || act.Action == "retrieval_probe":
+		return "consolidate"
+	case ctx.Curriculum == "" || ctx.OutlineStatus != "confirmed":
+		return "collect"
+	case act.Action == "continue_curriculum" && ctx.NextNode == nil:
+		return "collect" // the book is finished: time for new material
+	default:
+		return "learn"
+	}
 }
 
 func decide(m *learner.Model, ctx Context) Action {

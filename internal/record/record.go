@@ -15,6 +15,8 @@ import (
 	"strings"
 
 	"github.com/hedykan/learning-system/internal/fsutil"
+
+	"github.com/hedykan/learning-system/internal/locator"
 )
 
 const Schema = "learning-os/interpretation@1"
@@ -40,16 +42,23 @@ type Concept struct {
 }
 
 // Relation links two concepts; the Agent decides that they are related.
+// Type is one of prerequisite, part_of, applies_to (directed: the declaring
+// concept depends on, is part of, or applies the other), contrast or related
+// (undirected, the default) (CR-2026-037).
 type Relation struct {
 	Concept string `json:"concept"`
+	Type    string `json:"type,omitempty"`
 	Note    string `json:"note,omitempty"`
 }
 
 // TextbookPoints summarizes, in a few lines, what the book says about a
 // concept on the pages the Agent actually read.
 type TextbookPoints struct {
-	Pages  []int    `json:"pages"`
-	Points []string `json:"points"`
+	Pages []int `json:"pages"`
+	// Locator says where the points come from for any resource kind
+	// (CR-2026-025); give it or the legacy pages, not both.
+	Locator *locator.Locator `json:"locator,omitempty"`
+	Points  []string         `json:"points"`
 }
 
 type Event struct {

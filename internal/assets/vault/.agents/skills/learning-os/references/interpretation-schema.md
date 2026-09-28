@@ -10,7 +10,7 @@ All arrays are optional, but a record must contain at least one item. Unknown fi
     {"id": "tail-latency", "label": "尾延迟", "aliases": ["p99 延迟"]},
     {"id": "replication-lag", "label": "复制延迟", "source_ref": {"node": "6.2"},
      "textbook_points": {"pages": [210, 212], "points": ["follower 异步应用 leader 的变更，因此读到的可能是旧值", "滞后通常很短，但在负载或故障时可能达到数秒甚至数分钟"]},
-     "related": [{"concept": "tail-latency", "note": "都关乎读到结果的时效"}]}
+     "related": [{"concept": "tail-latency", "type": "contrast", "note": "都关乎读到结果的时效"}]}
   ],
   "events": [
     {"id": "e1", "type": "prediction", "concept": "tail-latency", "summary": "...", "evidence": [{"turn": "t0010", "quote": "exact learner words"}]}
@@ -68,8 +68,14 @@ All arrays are optional, but a record must contain at least one item. Unknown fi
 - `fragile` needs a misconception event or an ineffective attempt on the concept.
 - `stable` needs an earlier developing state plus retrieved or transferred evidence from a later session than the first explanation.
 - `strategy_switch` is derived from `replaces`; do not submit it as an event.
-- `textbook_points`: 1–5 points of 4–120 characters, `pages: [start, end]` inside the concept's outline entry. A record may carry only concepts with textbook points. Submitting new points replaces the current version; the old one stays in the note's history.
-- `related`: other concept IDs (existing or declared in the same record), with an optional note of at most 40 characters. Relations are undirected; never relate a concept to itself.
+- `textbook_points`: 1–5 points of 4–120 characters, with where you read them: `pages: [start, end]` for a PDF, or a `locator` for any material (`{"kind": "anchor", "value": "#replication-lag"}`, `{"kind": "time", "value": "3/05:20-12:00"}`, `{"kind": "page", "value": "42-45"}` for a paper book). Give one of the two, inside the concept's outline entry. A record may carry only concepts with textbook points. Submitting new points replaces the current version; the old one stays in the note's history.
+- `related`: other concept IDs (existing or declared in the same record), with an optional `type` and a note of at most 40 characters. Never relate a concept to itself.
+  - `prerequisite`: this concept needs the other one first (replication lag → replication).
+  - `part_of`: this concept is a part of the other one (ETag → cache validation).
+  - `applies_to`: this concept applies the other one (CDN revalidation → conditional requests).
+  - `contrast`: the two are easy to confuse (fresh cache hit ↔ revalidation).
+  - `related` (default): any other real connection.
+  Directed types are declared on the dependent side; the graph draws an arrow from it. Restating a pair in a later record replaces its type, direction and note. Prerequisites must not form a cycle.
 - `review_results.outcome`: `recalled`, `partial`, or `forgotten`; `action_turn` is your question in this session and evidence comes after it.
 - `no_related`: concepts you checked and found unrelated to every existing concept; the end-of-session check stops asking about them until a relation is added.
 - A record may carry only concepts with textbook points or relations, or only `no_related`.

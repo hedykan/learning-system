@@ -103,6 +103,34 @@ learn session abort --reason <reason> [--json]
 - `restore` 在同 ID 已被占用时拒绝。归档后可用原 ID 重新导入，导入计划的 `archived_match` 提示内容相同的归档。
 - `purge` 永久删除归档，需要 `--yes` 与重复一次归档 ID 的 `--confirm`。
 
+## 资料（v0.1.8）
+
+```bash
+learn curriculum import --external --id <id> --title <name> [--url <url>] [--note <text>] [--dry-run|--yes] [--activate]
+learn source add <path> --id <id> [--title <name>] [--link] [--json]
+learn source add --external --id <id> --title <name> [--url <url>] [--note <text>] [--json]
+learn source list [--json]
+learn source outline <source> [--json]
+learn source read <source> <kind> <value> [--json]
+learn source attach <node> <source> <kind> <value> [--curriculum <id>] [--json]
+learn source detach <node> <source> [--curriculum <id>]
+learn source check [curriculum] [--json]
+```
+
+- 来源 ID：课程自身的资料用课程 ID；其他资料（`Sources/<id>/resource.yaml`）不会出现在课程列表中，可被多门课程共用。
+- 每份资料声明 `capabilities`：`structured`（可出草稿目录）、`extractable`（`source read` 可取文字，统一为 Markdown）、`needs_vision`、`external`（没有文件）。读不了时 `source read --json` 返回 `status: unsupported` 与原因。
+- 定位 `locator`：`{"resource", "kind", "value"}`，kind 为 `page`（`42-45`）、`anchor`（`#slug`）、`file`（`a.md#L10-40`）、`time`（`3/05:20-48:00`）、`chapter`、`text`。目录条目与 `textbook_points` 可用 `locator` 代替 `pages`；可比较的位置必须落在上级条目内。每种资料只接受适合它的定位：PDF 为 page，Markdown 为 anchor、file，外部资料为 page、time、text。
+- `source attach` 只能挂到已确认大纲的条目上；挂载记录在 `Curriculum/<id>/resources.yaml`。`next --json` 的 `resources` 与 `status --json` 的 `node_resources` 列出当前小节的资料位置。
+- `source check` 报告失效的定位，以及外部课程中没有任何资料位置的条目（`unsourced`）。
+- 文件夹资料按自然顺序读取（`ch2` 在 `ch10` 前）。
+
+## 三段流程与图谱（v0.1.8）
+
+- `next --json` 输出 `stage`：`consolidate`（复习到期、独立回忆）、`collect`（没有激活的课程、大纲未确认、全书学完）、`learn`（其余）。
+- 所有生成文档带固定英文层级标签：`learning/knowledge/{concept,question}`、`learning/evidence/conversation`、`learning/process/{session,progress}`、`learning/nav/{home,overview,curriculum}`。`agent update` 为旧原始对话补标签，只改 frontmatter。
+- `init` 与 `agent update` 在 `.obsidian/graph.json` 不存在时写入默认图谱配置：筛选 `-tag:#learning/evidence -tag:#learning/process -tag:#learning/nav -path:Sources`、关闭显示标签、按状态着色；已存在时不修改。
+- 概念关系 `related[].type`：`prerequisite`、`part_of`、`applies_to`（有方向，声明在依赖方）、`contrast`、`related`（缺省）。一对概念只保存一条关系，后来的记录替换；先修成环时拒收。
+
 ## Detour（v0.1.2）
 
 `detour start` 以当前位置作为 return point，写入 Detour 原因与返回条件；`detour end` 追加 Detour 日志并恢复到 return point。已有未结束 Detour 时拒绝再次 start；Baseline Session 期间两者都被拒绝。

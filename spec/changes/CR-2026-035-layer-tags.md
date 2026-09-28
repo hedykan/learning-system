@@ -1,7 +1,7 @@
 ---
 id: CR-2026-035
 title: "按层给生成文档打标签，支持 Obsidian 按标签筛选"
-status: accepted
+status: implemented
 target_version: v0.1.8
 created: 2026-09-28
 ---
@@ -32,7 +32,7 @@ v0.1.6 测试 Vault 中，概念笔记发出的链接只有 42 条指向其他�
 ### 默认图谱配置
 
 - `.obsidian/graph.json` **不存在时**，`init` 与 `agent update` 写入默认配置：
-  - 筛选：`-tag:#learning/evidence -tag:#learning/process -tag:#learning/nav`（保留学习者自己的笔记）；
+  - 筛选：`-tag:#learning/evidence -tag:#learning/process -tag:#learning/nav -path:Sources`（保留学习者自己的笔记）；
   - 关闭“显示标签”（`showTags: false`），开启箭头；
   - 着色：stable 绿、fragile 橙、developing 蓝、问题紫。
 - 文件已存在时绝不修改；首页“怎么用”写明手动设置步骤与常用筛选写法。
@@ -43,7 +43,7 @@ v0.1.6 测试 Vault 中，概念笔记发出的链接只有 42 条指向其他�
 | --- | --- |
 | 全部生成文档 | `tag:#learning` |
 | 只看知识 | `tag:#learning/knowledge` |
-| 知识 + 手写笔记 | `-tag:#learning/evidence -tag:#learning/process -tag:#learning/nav` |
+| 知识 + 手写笔记 | `-tag:#learning/evidence -tag:#learning/process -tag:#learning/nav -path:Sources` |
 | 某本书还不稳固的知识 | `tag:#learning/knowledge tag:#learning/curriculum/<id> tag:#learning/state/fragile` |
 
 ## 数据与兼容性影响
@@ -65,3 +65,5 @@ v0.1.6 测试 Vault 中，概念笔记发出的链接只有 42 条指向其他�
 ## 决策
 
 2026-09-28 接受，排入 v0.1.8。原始对话采用“只加标签”的一次性迁移；如学习者更倾向不改动原始对话，可改为按路径筛选。
+
+2026-09-28 实现：`internal/tags`；所有生成文档带层级标签；`agent update` 为旧原始对话补标签（只改 frontmatter）；默认 `graph.json` 仅在不存在时写入，筛选另外排除 `-path:Sources`（导入的教材原文）；Vault `.gitignore` 忽略 `.obsidian/workspace*.json`。

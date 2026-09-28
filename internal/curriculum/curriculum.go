@@ -13,6 +13,7 @@ import (
 
 	"github.com/hedykan/learning-system/internal/config"
 	"github.com/hedykan/learning-system/internal/fsutil"
+	"github.com/hedykan/learning-system/internal/source"
 	"gopkg.in/yaml.v3"
 )
 
@@ -30,6 +31,9 @@ type Manifest struct {
 	OriginalPath string `yaml:"original_path,omitempty" json:"original_path,omitempty"`
 	SHA256       string `yaml:"sha256" json:"sha256"`
 	ImportedAt   string `yaml:"imported_at" json:"imported_at"`
+	// URL and Note describe external material (CR-2026-028).
+	URL  string `yaml:"url,omitempty" json:"url,omitempty"`
+	Note string `yaml:"note,omitempty" json:"note,omitempty"`
 }
 
 type Position struct {
@@ -63,13 +67,18 @@ type ReturnPoint struct {
 
 type ImportOptions struct {
 	SourcePath string
-	ID         string
-	Title      string
-	Mode       string
-	Activate   bool
-	DryRun     bool
-	Confirmed  bool
-	Now        time.Time
+	// External creates a curriculum without a file (a video course, a paper
+	// book, a class); Title is required and URL/Note describe it.
+	External  bool
+	URL       string
+	Note      string
+	ID        string
+	Title     string
+	Mode      string
+	Activate  bool
+	DryRun    bool
+	Confirmed bool
+	Now       time.Time
 }
 
 type ImportPlan struct {
@@ -89,6 +98,9 @@ type ImportPlan struct {
 func Import(root string, opts ImportOptions) (ImportPlan, error) {
 	if !validID.MatchString(opts.ID) {
 		return ImportPlan{}, fmt.Errorf("invalid curriculum id %q: use lowercase letters, digits, and hyphens", opts.ID)
+	}
+	if opts.External {
+		return importExternal(root, opts)
 	}
 	if opts.Mode == "" {
 		opts.Mode = "copy"
@@ -170,23 +182,56 @@ func Import(root string, opts ImportOptions) (ImportPlan, error) {
 	return plan, nil
 }
 
+// importExternal registers material that has no file. Its outline is built
+// by the Agent from a playlist, a photo of the contents page or a syllabus.
+func importExternal(root string, opts ImportOptions) (ImportPlan, error) {
+	title := strings.TrimSpace(opts.Title)
+	if title == "" {
+		return ImportPlan{}, fmt.Errorf("an external curriculum needs --title")
+	}
+	if opts.SourcePath != "" {
+		return ImportPlan{}, fmt.Errorf("an external curriculum has no file; drop the path or --external")
+	}
+	plan := ImportPlan{ID: opts.ID, Title: title, Kind: "external", Mode: "none",
+		Destination: filepath.Join(root, "Sources", opts.ID), Activate: opts.Activate, DryRun: opts.DryRun}
+	if _, err := os.Stat(plan.Destination); err == nil {
+		return plan, fmt.Errorf("%w: id %s", ErrAlreadyImported, opts.ID)
+	}
+	if opts.DryRun {
+		return plan, nil
+	}
+	if !opts.Confirmed {
+		return plan, fmt.Errorf("import requires --yes after reviewing a dry run")
+	}
+	if opts.Now.IsZero() {
+		opts.Now = time.Now()
+	}
+	manifest := Manifest{Version: 1, ID: opts.ID, Title: title, Kind: "external", Mode: "none",
+		URL: opts.URL, Note: opts.Note, ImportedAt: opts.Now.UTC().Format(time.RFC3339)}
+	data, err := yaml.Marshal(manifest)
+	if err != nil {
+		return plan, err
+	}
+	if err := fsutil.WriteFileAtomic(filepath.Join(plan.Destination, "manifest.yaml"), data, 0o644); err != nil {
+		return plan, err
+	}
+	if err := writeCurriculum(root, manifest, ""); err != nil {
+		return plan, err
+	}
+	if opts.Activate {
+		if err := Activate(root, opts.ID); err != nil {
+			return plan, err
+		}
+	}
+	return plan, nil
+}
+
 func sourceKind(path string, info fs.FileInfo) (string, error) {
-	if info.IsDir() {
-		return "directory", nil
+	a, err := source.Detect(path, info)
+	if err != nil {
+		return "", err
 	}
-	if !info.Mode().IsRegular() {
-		return "", fmt.Errorf("source must be a regular file or directory")
-	}
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".md":
-		return "markdown", nil
-	case ".txt":
-		return "text", nil
-	case ".pdf":
-		return "pdf", nil
-	default:
-		return "", fmt.Errorf("unsupported source format %q; v0.1 supports Markdown, text, and PDF", filepath.Ext(path))
-	}
+	return a.Kind(), nil
 }
 
 func writeSource(root, source string, info fs.FileInfo, manifest Manifest) error {
@@ -250,7 +295,9 @@ func writeCurriculum(root string, manifest Manifest, source string) error {
 		return err
 	}
 	outline := Outline{Version: 2, Status: "missing"}
-	if nodes, err := MarkdownOutline(source); err == nil && len(nodes) > 0 {
+	if source == "" {
+		// External material: the Agent builds the outline.
+	} else if nodes, err := MarkdownOutline(source); err == nil && len(nodes) > 0 {
 		outline = Outline{Version: 2, Status: "draft", Nodes: nodes}
 		if outline.Validate() != nil {
 			outline = Outline{Version: 2, Status: "missing"}
@@ -274,6 +321,9 @@ func List(root string) ([]Manifest, error) {
 	for _, entry := range entries {
 		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
+		}
+		if _, err := os.Stat(resourcePath(root, entry.Name())); err == nil {
+			continue // a resource, not a curriculum
 		}
 		manifest, err := LoadManifest(root, entry.Name())
 		if err != nil {

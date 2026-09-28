@@ -5,3 +5,6 @@ Sources/*/original/*.pdf
 .learning/*.lock
 .learning/.learn-tmp-*
 .learning/backups/
+
+# Obsidian window layout changes on every click; graph and other settings stay tracked.
+.obsidian/workspace*.json

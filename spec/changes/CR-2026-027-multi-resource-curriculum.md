@@ -1,7 +1,7 @@
 ---
 id: CR-2026-027
 title: "课程挂多份资料"
-status: accepted
+status: implemented
 target_version: v0.1.8
 created: 2026-09-28
 ---
@@ -42,3 +42,5 @@ created: 2026-09-28
 ## 决策
 
 2026-09-28 接受，排入 v0.1.8。
+
+2026-09-28 实现：`Curriculum/<id>/resources.yaml` 记录辅助资料与挂载点（挂载不写进 `outline.yaml`，避免重新提交大纲时丢失）；资料存于 `Sources/<id>/resource.yaml`，不会被当作课程；`learn source attach/detach`；`next` 与 `status` 输出当前小节的资料；教材首页列出资料与挂载。

@@ -56,7 +56,7 @@ If a concept is currently `stable` and this record shows a misconception on it o
 4. Name the old model in the learner's terms and the new model as the learner now states it. The trigger is what you did in between (`trigger_turn` is your assistant turn).
 5. When you corrected an error during teaching, record it: a `misconception` event for the wrong idea and a `correction` event (or a cognitive change) for the fix. Do not reduce a corrected mistake to an `application` event.
 6. Judge strategies honestly. `effective` must link the change or positive event it produced; otherwise use `inconclusive` or `ineffective` with a reason.
-7. Link concepts that the book or the learner's reasoning actually connects (prerequisite, contrast, part of, same mechanism) with `related`. Two or three meaningful links per concept are better than many weak ones; they become the Obsidian graph.
+7. Link concepts that the book or the learner's reasoning actually connects with `related`, choosing the most specific `type` (prerequisite, part_of, applies_to, contrast, related). Two or three meaningful links per concept are better than many weak ones; they become the Obsidian graph. Links to concepts of another textbook are the most valuable ones: add them whenever the learner connects the two books.
 8. Record a learning pattern only when the same way of learning appears again. Add `contradicts` observations when the learner breaks the pattern; they matter as much as support.
 9. When an earlier judgment was wrong, add a `retraction` with its global ID (`<session-id>:<local-id>`) and a reason.
 

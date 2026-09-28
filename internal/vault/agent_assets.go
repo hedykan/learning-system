@@ -59,8 +59,28 @@ func UpdateAgentAssets(root string, dryRun, confirmed bool, now time.Time) (Agen
 		changed = append(changed, rel)
 	}
 	emptyLegacy := legacyDirectoryChanges(root, &result)
+	untagged, err := untaggedConversations(root)
+	if err != nil {
+		return result, err
+	}
+	for _, rel := range untagged {
+		result.Changes = append(result.Changes, AgentAssetChange{Path: rel, Action: "add-tag"})
+	}
+	if graph, err := ensureGraphConfig(root, true); err != nil {
+		return result, err
+	} else if graph {
+		result.Changes = append(result.Changes, AgentAssetChange{Path: GraphConfigPath, Action: "create"})
+	}
 	if dryRun {
 		return result, nil
+	}
+	for _, rel := range untagged {
+		if err := tagConversation(root, rel); err != nil {
+			return result, fmt.Errorf("tag conversation %s: %w", rel, err)
+		}
+	}
+	if _, err := ensureGraphConfig(root, false); err != nil {
+		return result, err
 	}
 	for _, dir := range emptyLegacy {
 		if err := removeIfEmpty(filepath.Join(root, dir)); err != nil {

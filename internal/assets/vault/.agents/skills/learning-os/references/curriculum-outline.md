@@ -5,7 +5,7 @@ The outline ties every lesson to the real textbook. Without a confirmed outline 
 ## Build the outline
 
 1. Read the table of contents in the imported source (`Sources/<id>/original/`). Use your own PDF or document reading tools. Put any extracted text or scratch files under `.learning/tmp/`, never elsewhere in the Vault.
-2. Write the outline as JSON or YAML: a `nodes` list in reading order. Each node has `id` (`1`, `1.2`, `1.2.3`), `title` exactly as printed, and `pages: [start, end]` using the PDF page numbers you actually read. A section's pages are its own range, found from where its heading appears in the text; if you cannot locate a section's start, omit its `pages` instead of copying the chapter's range. Include chapters and the sections you can see; skip front matter, indexes, and parts like “I 数据系统基础”.
+2. Write the outline as JSON or YAML: a `nodes` list in reading order. Each node has `id` (`1`, `1.2`, `1.2.3`), `title` exactly as printed, and `pages: [start, end]` using the PDF page numbers you actually read (for other material give a `locator` instead, see [resources](resources.md); Markdown books already get a draft from their headings). A section's pages are its own range, found from where its heading appears in the text; if you cannot locate a section's start, omit its `pages` instead of copying the chapter's range. Include chapters and the sections you can see; skip front matter, indexes, and parts like “I 数据系统基础”.
 3. Validate without writing:
 
    ```bash

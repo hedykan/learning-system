@@ -78,6 +78,11 @@ func Init(path string, now time.Time) (InitResult, error) {
 	if err := EnsureTmp(root); err != nil {
 		return result, err
 	}
+	if created, err := ensureGraphConfig(root, false); err != nil {
+		return result, err
+	} else if created {
+		result.Created = append(result.Created, GraphConfigPath)
+	}
 	if err := fs.WalkDir(assets.Vault, "vault", func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr

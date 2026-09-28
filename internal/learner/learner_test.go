@@ -8,6 +8,7 @@ import (
 
 	"github.com/hedykan/learning-system/internal/conversation"
 	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/locator"
 	"github.com/hedykan/learning-system/internal/record"
 )
 
@@ -285,8 +286,19 @@ func TestTextbookPoints(t *testing.T) {
 		t.Fatal(err)
 	}
 	pts := m.Concepts["tail-latency"].Points
-	if len(pts) != 2 || pts[1].Pages[1] != 38 || pts[0].Points[0] != "响应时间是一个分布" {
+	if len(pts) != 2 || pts[1].Locator.Value != "34-38" || pts[1].Locator.Kind != "page" || pts[0].Points[0] != "响应时间是一个分布" {
 		t.Fatalf("points history = %+v", pts)
+	}
+	// A locator works for resources without pages; mixing it with pages is refused.
+	video := record.Record{Concepts: []record.Concept{{ID: "tail-latency", TextbookPoints: &record.TextbookPoints{
+		Locator: &locator.Locator{Kind: "time", Value: "3/05:20-12:00"}, Points: []string{"用百分位数而不是平均值描述响应时间"}}}}}
+	if m, err := replay(t, env(s1, 1, "checkpoint", with(good)), env(s2, 1, "checkpoint", video)); err != nil || m.Concepts["tail-latency"].Points[1].Locator.Kind != "time" {
+		t.Fatalf("time locator: %v", err)
+	}
+	both := record.Record{Concepts: []record.Concept{{ID: "tail-latency", TextbookPoints: &record.TextbookPoints{Pages: []int{1, 2},
+		Locator: &locator.Locator{Kind: "page", Value: "1-2"}, Points: []string{"用百分位数而不是平均值描述响应时间"}}}}}
+	if _, err := replay(t, env(s1, 1, "checkpoint", with(good)), env(s2, 1, "checkpoint", both)); err == nil {
+		t.Fatal("pages and locator together accepted")
 	}
 }
 

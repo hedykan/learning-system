@@ -17,7 +17,7 @@ Keep every Runtime operation backstage and follow the "Learner-facing voice" rul
 4. If the active curriculum reports `baseline.state = not_assessed`, read [baseline workflow](references/baseline-workflow.md). Establish the baseline before a lesson unless the user explicitly skips it.
 5. Read [learning policy](references/learning-policy.md) and [session workflow](references/session-workflow.md) before teaching or reviewing.
 6. Run `learn next --json` and let its action, concept, strategy, curriculum relation, and next node shape the first teaching move. It encodes what earlier sessions showed about this learner. When it returns `review_due`, follow [review workflow](references/review-workflow.md) first.
-7. Before teaching a node, read its pages in the source. Teach what the book says, in the book's order.
+7. Before teaching a node, read it in the source. `learn next --json` and `learn status --json` list the node's `resources` (the book's pages, an attached video segment...). Teach what the material says, in its order. How to read each kind of material is in [resources](references/resources.md).
 
 ## Record understanding
 
@@ -25,7 +25,7 @@ The Learner Model grows only from Interpretation Records you submit and the Runt
 
 ## Import material
 
-Read [curriculum import](references/curriculum-import.md) when the user provides a textbook or course path, or wants to stop studying, remove, or restore a book. Complete a dry run before the real import, then build the outline with [curriculum outline](references/curriculum-outline.md).
+Read [curriculum import](references/curriculum-import.md) when the user provides a textbook or course path, a video course, a paper book or a class, or wants to stop studying, remove, or restore a book. Complete a dry run before the real import, then build the outline with [curriculum outline](references/curriculum-outline.md).
 
 ## Safety boundary
 

@@ -22,6 +22,7 @@ import (
 	"github.com/hedykan/learning-system/internal/projection"
 	"github.com/hedykan/learning-system/internal/record"
 	runtimeState "github.com/hedykan/learning-system/internal/runtime"
+	"github.com/hedykan/learning-system/internal/tags"
 )
 
 type StartResult struct {
@@ -125,7 +126,7 @@ func Start(root string, opts StartOptions, now time.Time) (StartResult, error) {
 		active.StartingSection = position.Section
 		active.StartingConcept = position.CurrentConcept
 	}
-	content := fmt.Sprintf("---\nid: %s\nstarted_at: %s\nkind: %s\ndepth: %q\nbaseline_skipped: %t\ndomain: %q\ncurriculum: %q\n---\n\n# Raw Conversation\n", id, active.StartedAt, active.Kind, active.Depth, active.BaselineSkipped, opts.Domain, active.Curriculum)
+	content := fmt.Sprintf("---\nid: %s\nstarted_at: %s\nkind: %s\ndepth: %q\nbaseline_skipped: %t\ndomain: %q\ncurriculum: %q\n%s---\n\n# Raw Conversation\n", id, active.StartedAt, active.Kind, active.Depth, active.BaselineSkipped, opts.Domain, active.Curriculum, tags.Lines(tags.Conversation))
 	if err := fsutil.WriteFileAtomic(filepath.Join(root, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
 		return StartResult{}, err
 	}
@@ -443,12 +444,17 @@ func anchorConcepts(root, curriculumID string, rec *record.Record) error {
 	return nil
 }
 
-// checkPointsInNode rejects textbook points whose pages fall outside the
-// concept's outline entry when a confirmed outline gives that entry pages.
+// checkPointsInNode rejects textbook points that fall outside the concept's
+// outline entry when both positions can be compared (pages, time ranges of
+// the same episode, line ranges of the same file).
 func checkPointsInNode(o curriculum.Outline, curriculumID string, m *learner.Model, c *record.Concept) error {
 	tp := c.TextbookPoints
-	if tp == nil || o.Status != "confirmed" || len(tp.Pages) != 2 {
+	if tp == nil || o.Status != "confirmed" {
 		return nil
+	}
+	loc, err := learner.PointsLocator(c.ID, tp)
+	if err != nil {
+		return nil // the replay reports the format error
 	}
 	node := ""
 	if c.SourceRef != nil {
@@ -463,11 +469,20 @@ func checkPointsInNode(o curriculum.Outline, curriculumID string, m *learner.Mod
 		}
 	}
 	n, ok := o.Find(node)
-	if !ok || len(n.Pages) != 2 {
+	if !ok {
 		return nil
 	}
-	if tp.Pages[0] < n.Pages[0] || tp.Pages[1] > n.Pages[1] {
-		return fmt.Errorf("concept %s textbook_points pages %d-%d fall outside outline entry %s (pages %d-%d)", c.ID, tp.Pages[0], tp.Pages[1], n.ID, n.Pages[0], n.Pages[1])
+	outer, ok := n.Where()
+	if !ok {
+		return nil
+	}
+	if inside, comparable := loc.Within(outer); comparable && !inside {
+		if loc.Kind == "page" {
+			a, b, _ := strings.Cut(loc.Value, "-")
+			c2, d, _ := strings.Cut(outer.Value, "-")
+			return fmt.Errorf("concept %s textbook_points pages %s-%s fall outside outline entry %s (pages %s-%s)", c.ID, a, b, n.ID, c2, d)
+		}
+		return fmt.Errorf("concept %s textbook_points %s %s falls outside outline entry %s (%s)", c.ID, loc.Kind, loc.Value, n.ID, outer.Value)
 	}
 	return nil
 }
@@ -648,7 +663,7 @@ func writeSessionFile(root string, active *runtimeState.ActiveSession, legacy *m
 	path := filepath.Join(root, filepath.FromSlash(rel))
 	existing, _ := os.ReadFile(path)
 	var b strings.Builder
-	fmt.Fprintf(&b, "---\nid: %s\ndate: %s\nkind: %s\ntermination: %s\ndepth: %q\ndomain: %q\nsource_conversation: %q\ncurriculum: %q\ngenerated_by: learn\n---\n\n", active.ID, now.UTC().Format("2006-01-02"), active.Kind, termination, active.Depth, active.Domain, active.Conversation, active.Curriculum)
+	fmt.Fprintf(&b, "---\nid: %s\ndate: %s\nkind: %s\ntermination: %s\ndepth: %q\ndomain: %q\nsource_conversation: %q\ncurriculum: %q\ngenerated_by: learn\n%s---\n\n", active.ID, now.UTC().Format("2006-01-02"), active.Kind, termination, active.Depth, active.Domain, active.Conversation, active.Curriculum, tags.Lines(tags.Session))
 	lang := vaultLang(root)
 	t := func(s string) string { return i18n.T(lang, s) }
 	none := func(v string) string { return t(valueOrNone(v)) }

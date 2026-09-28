@@ -23,11 +23,13 @@ import (
 	"github.com/hedykan/learning-system/internal/mdblock"
 	"github.com/hedykan/learning-system/internal/policy"
 	runtimeState "github.com/hedykan/learning-system/internal/runtime"
+	"github.com/hedykan/learning-system/internal/tags"
 )
 
 // Inputs is everything a projection needs besides the model.
 type Inputs struct {
 	Model      *learner.Model
+	Root       string
 	Lang       string // interface language of fixed text (CR-2026-023)
 	Resolver   *learner.VaultResolver
 	Active     string
@@ -35,6 +37,7 @@ type Inputs struct {
 	Positions  map[string]curriculum.Position
 	DetourLogs map[string][]curriculum.DetourLogEntry
 	Outlines   map[string]curriculum.Outline
+	Resources  map[string]curriculum.ResourceSet
 	Statuses   map[string][]curriculum.NodeStatus
 	Archived   map[string]bool
 	Library    []string // imported, non-archived curricula in id order
@@ -60,9 +63,9 @@ type RecentSession struct {
 
 // Gather loads curriculum context for every curriculum the model touches.
 func Gather(root string, m *learner.Model) (Inputs, error) {
-	in := Inputs{Model: m, Resolver: learner.NewResolver(root), Titles: map[string]string{},
+	in := Inputs{Model: m, Root: root, Resolver: learner.NewResolver(root), Titles: map[string]string{},
 		Positions: map[string]curriculum.Position{}, DetourLogs: map[string][]curriculum.DetourLogEntry{},
-		Outlines: map[string]curriculum.Outline{}, Statuses: map[string][]curriculum.NodeStatus{}, Archived: map[string]bool{}}
+		Outlines: map[string]curriculum.Outline{}, Resources: map[string]curriculum.ResourceSet{}, Statuses: map[string][]curriculum.NodeStatus{}, Archived: map[string]bool{}}
 	cfg, err := config.Load(root)
 	if err != nil {
 		return in, err
@@ -123,6 +126,9 @@ func Gather(root string, m *learner.Model) (Inputs, error) {
 			return in, err
 		}
 		in.Outlines[id] = outline
+		if set, err := curriculum.LoadResourceSet(root, id); err == nil {
+			in.Resources[id] = set
+		}
 		in.Statuses[id] = curriculum.Statuses(outline, entries, in.Positions[id], m.NodesWithEvidence(id))
 	}
 	recent, err := recentSessions(root, 5)
@@ -148,11 +154,19 @@ func Gather(root string, m *learner.Model) (Inputs, error) {
 			return in, err
 		}
 		ctx := policy.Context{Curriculum: in.Active, Assessed: status.State == "assessed", BaselineSkipped: skipped,
-			Position: in.Positions[in.Active], ActiveSession: active, Today: in.Today, Lang: in.Lang}
+			Position: in.Positions[in.Active], ActiveSession: active, Today: in.Today, Lang: in.Lang,
+			OutlineStatus: in.Outlines[in.Active].Status}
 		if n, ok := curriculum.NextNode(in.Outlines[in.Active], in.Statuses[in.Active], in.Positions[in.Active]); ok {
 			ctx.NextNode = &n
 		}
 		next := policy.Next(m, ctx)
+		node := next.Node
+		if node == "" {
+			node = in.Positions[in.Active].Node
+		}
+		if res, err := curriculum.NodeResources(root, in.Active, node, in.Lang); err == nil && len(res) > 0 {
+			next.Resources = res
+		}
 		in.Next = &next
 	}
 	return in, nil
@@ -201,8 +215,9 @@ func Plan(root string, in Inputs) ([]File, error) {
 	for id := range in.Model.Sessions {
 		rel := "Sessions/" + id + ".md"
 		existing, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
-		header := fmt.Sprintf("---\nid: %s\ngenerated_by: learn\n---\n\n", id) + i18n.F(in.Lang, "# 学习记录 %s\n", sessionLabel(id))
-		rendered[rel] = mdblock.UpsertIn(in.Lang, string(existing), "analysis", renderSessionAnalysis(in, id), header)
+		header := fmt.Sprintf("---\nid: %s\ngenerated_by: learn\n%s---\n\n", id, tags.Lines(tags.Session)) + i18n.F(in.Lang, "# 学习记录 %s\n", sessionLabel(id))
+		text, _ := tags.Ensure(mdblock.UpsertIn(in.Lang, string(existing), "analysis", renderSessionAnalysis(in, id), header), tags.Session)
+		rendered[rel] = text
 	}
 	paths := make([]string, 0, len(rendered))
 	for p := range rendered {
