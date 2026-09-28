@@ -39,6 +39,7 @@ type Inputs struct {
 	Outlines   map[string]curriculum.Outline
 	Resources  map[string]curriculum.ResourceSet
 	Unsourced  map[string]map[string]bool // curriculum -> entries without any resource
+	Goals      map[string]curriculum.StoredGoal
 	Statuses   map[string][]curriculum.NodeStatus
 	Archived   map[string]bool
 	Library    []string // imported, non-archived curricula in id order
@@ -66,7 +67,7 @@ type RecentSession struct {
 func Gather(root string, m *learner.Model) (Inputs, error) {
 	in := Inputs{Model: m, Root: root, Resolver: learner.NewResolver(root), Titles: map[string]string{},
 		Positions: map[string]curriculum.Position{}, DetourLogs: map[string][]curriculum.DetourLogEntry{},
-		Outlines: map[string]curriculum.Outline{}, Resources: map[string]curriculum.ResourceSet{}, Unsourced: map[string]map[string]bool{}, Statuses: map[string][]curriculum.NodeStatus{}, Archived: map[string]bool{}}
+		Outlines: map[string]curriculum.Outline{}, Resources: map[string]curriculum.ResourceSet{}, Unsourced: map[string]map[string]bool{}, Goals: map[string]curriculum.StoredGoal{}, Statuses: map[string][]curriculum.NodeStatus{}, Archived: map[string]bool{}}
 	cfg, err := config.Load(root)
 	if err != nil {
 		return in, err
@@ -131,6 +132,9 @@ func Gather(root string, m *learner.Model) (Inputs, error) {
 			in.Resources[id] = set
 		}
 		in.Unsourced[id] = curriculum.Unsourced(root, id)
+		if g, ok, err := curriculum.LoadGoal(root, id); err == nil && ok {
+			in.Goals[id] = g
+		}
 		in.Statuses[id] = curriculum.Statuses(outline, entries, in.Positions[id], m.NodesWithEvidence(id))
 	}
 	recent, err := recentSessions(root, 5)

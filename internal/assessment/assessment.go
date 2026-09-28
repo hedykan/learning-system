@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -17,6 +18,10 @@ import (
 type Finding struct {
 	Claim    string `json:"claim"`
 	Evidence string `json:"evidence"`
+	// Concepts names the concept ids the finding is about, the same ids
+	// outline entries declare, so the finding can shape the curriculum
+	// (CR-2026-044).
+	Concepts []string `json:"concepts,omitempty"`
 }
 
 type Report struct {
@@ -31,6 +36,8 @@ type Report struct {
 	RecommendedEntry       curriculum.Position `json:"recommended_entry"`
 	RecommendationReason   string              `json:"recommendation_reason"`
 	NextProbe              string              `json:"next_probe"`
+	// GoalCard is the structured goal from the intake interview (CR-2026-043).
+	GoalCard *curriculum.GoalCard `json:"goal_card,omitempty"`
 }
 
 type Status struct {
@@ -91,6 +98,16 @@ func Validate(report *Report, conversationText, curriculumID, depth string) erro
 			if !strings.Contains(conversation.Normalize(userEvidence), conversation.Normalize(evidence)) {
 				return fmt.Errorf("%s finding %d cites evidence not found in a raw user turn", category, i)
 			}
+			for _, c := range finding.Concepts {
+				if !conceptID.MatchString(c) {
+					return fmt.Errorf("%s finding %d: concept id %q must be kebab-case", category, i, c)
+				}
+			}
+		}
+	}
+	if report.GoalCard != nil {
+		if err := CheckGoalCard(*report.GoalCard, conversationText); err != nil {
+			return err
 		}
 	}
 	if strings.TrimSpace(report.RecommendationReason) == "" {
@@ -101,6 +118,26 @@ func Validate(report *Report, conversationText, curriculumID, depth string) erro
 	}
 	if report.RecommendedEntry.Book != "" && report.RecommendedEntry.Book != curriculumID {
 		return fmt.Errorf("recommended entry book %q does not match active curriculum %q", report.RecommendedEntry.Book, curriculumID)
+	}
+	return nil
+}
+
+var conceptID = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+
+// CheckGoalCard validates a goal card and that each field's evidence is the
+// learner's own words in the conversation.
+func CheckGoalCard(card curriculum.GoalCard, conversationText string) error {
+	if err := card.Check(); err != nil {
+		return err
+	}
+	userEvidence, err := roleText(conversationText, "user")
+	if err != nil {
+		return err
+	}
+	for name, it := range card.Items() {
+		if !strings.Contains(conversation.Normalize(userEvidence), conversation.Normalize(strings.TrimSpace(it.Evidence))) {
+			return fmt.Errorf("goal card %s cites evidence not found in a raw learner turn", name)
+		}
 	}
 	return nil
 }
@@ -216,4 +253,21 @@ func valueOrNone(value string) string {
 		return "Not set"
 	}
 	return value
+}
+
+// Latest returns the most recent assessment of a curriculum, or nil.
+func Latest(root, curriculumID string) (*Report, error) {
+	status, err := CurrentStatus(root, curriculumID)
+	if err != nil || status.State != "assessed" {
+		return nil, err
+	}
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(strings.TrimSuffix(status.Path, ".md")+".json")))
+	if err != nil {
+		return nil, fmt.Errorf("read latest assessment: %w", err)
+	}
+	var saved savedReport
+	if err := json.Unmarshal(data, &saved); err != nil {
+		return nil, fmt.Errorf("parse latest assessment: %w", err)
+	}
+	return &saved.Report, nil
 }

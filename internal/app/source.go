@@ -193,7 +193,7 @@ func (a *App) sourceReadCommand(explicitVault *string) *cobra.Command {
 }
 
 func (a *App) sourceAttachCommand(explicitVault *string) *cobra.Command {
-	var curriculumID string
+	var curriculumID, why, serves string
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use: "attach <node> <source> <kind> <value>", Short: "Attach a resource position to an outline entry (e.g. attach 1.2 lectures time 3/05:20-48:00)", Args: cobra.ExactArgs(4),
@@ -202,7 +202,7 @@ func (a *App) sourceAttachCommand(explicitVault *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			res, err := curriculum.Attach(root, id, args[0], locator.Locator{Resource: args[1], Kind: args[2], Value: args[3]})
+			res, err := curriculum.AttachWith(root, id, args[0], locator.Locator{Resource: args[1], Kind: args[2], Value: args[3]}, why, serves)
 			if err != nil {
 				return err
 			}
@@ -217,6 +217,8 @@ func (a *App) sourceAttachCommand(explicitVault *string) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&curriculumID, "curriculum", "", "curriculum id (default: the active one)")
+	cmd.Flags().StringVar(&why, "why", "", "why this resource was chosen for the entry (at most 120 characters)")
+	cmd.Flags().StringVar(&serves, "serves", "", "the goal card focus id this resource serves")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
 	return cmd
 }

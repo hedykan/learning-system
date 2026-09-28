@@ -9,9 +9,19 @@ import (
 
 const goalOutline = `{"nodes":[
  {"id":"1","title":"向量与相似度","why":"检索的基础是把内容变成向量","concepts":["embedding"]},
- {"id":"2","title":"近似最近邻索引","why":"精确搜索太慢","prerequisites":["1"]},
- {"id":"2.1","title":"HNSW","prerequisites":["1"]},
- {"id":"3","title":"混合检索","prerequisites":["2"]}]}`
+  {"id":"2","title":"近似最近邻索引","why":"精确搜索太慢","prerequisites":["1"],"serves":["ann-index"]},
+ {"id":"2.1","title":"HNSW","why":"最常用的图索引","prerequisites":["1"],"serves":["ann-index"]},
+ {"id":"3","title":"混合检索","why":"结合关键词与向量","prerequisites":["2"]}]}`
+
+// intakeAssessment ends an intake baseline with a goal card (CR-2026-043/044).
+const intakeAssessment = `{"curriculum":"vdb","depth":"quick",
+ "learning_goals":[{"claim":"能自己选型并调优","evidence":"想能自己选型并调优向量检索"}],
+ "existing_knowledge":[{"claim":"熟悉余弦相似度","evidence":"余弦相似度我在推荐系统里用过","concepts":["embedding"]}],
+ "prerequisite_gaps":[],"possible_misconceptions":[],"familiar_vocabulary":[],"unknown_vocabulary":[],
+ "recommended_entry":{"book":"","chapter":"","section":"","current_concept":"","last_completed":"","next_textbook_step":"","detour":null},
+ "recommendation_reason":"从索引开始","next_probe":"问 HNSW 参数",
+ "goal_card":{"outcome":{"text":"能自己选型并调优向量检索服务","evidence":"想能自己选型并调优向量检索"},
+   "focus":[{"id":"ann-index","text":"近似最近邻索引","evidence":"最想搞懂索引"}]}}`
 
 func goalCurriculum(t *testing.T) *cli {
 	c := newCLI(t)
@@ -20,6 +30,17 @@ func goalCurriculum(t *testing.T) *cli {
 		t.Fatalf("goal without title: %s", out)
 	}
 	c.run("", false, "curriculum", "import", "--goal", "搞懂向量数据库", "--id", "vdb", "--title", "向量数据库入门", "--activate", "--yes")
+	if out := c.run(goalOutline, true, "curriculum", "outline", "set", "--file", "-"); !strings.Contains(out, "no goal card yet") {
+		t.Fatalf("outline before intake: %s", out)
+	}
+	// Intake before the outline: interview and diagnosis in one baseline.
+	c.run("", false, "session", "start", "--kind", "baseline", "--depth", "quick")
+	c.run("你想达到什么程度？", false, "session", "append", "--role", "assistant")
+	c.run("想能自己选型并调优向量检索，最想搞懂索引。余弦相似度我在推荐系统里用过", false, "session", "append", "--role", "user")
+	c.run(intakeAssessment, false, "session", "end", "--assessment-file", "-")
+	if goal := c.run("", false, "curriculum", "goal", "show", "--json"); !strings.Contains(goal, `"source": "assessment"`) || !strings.Contains(goal, "ann-index") {
+		t.Fatalf("goal card from the intake: %s", goal)
+	}
 	return c
 }
 

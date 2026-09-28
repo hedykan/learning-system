@@ -1,7 +1,7 @@
 ---
 id: CR-2026-043
 title: "学习目标卡"
-status: accepted
+status: implemented
 target_version: v0.2.1
 created: 2026-09-28
 ---
@@ -45,3 +45,5 @@ v0.2 的目标只以一句话存进课程，Skill 只要求“问一两个问题
 ## 决策
 
 2026-09-28 接受，排入 v0.2.1。
+
+2026-09-28 实现：`Curriculum/<id>/goal.yaml` 与 `goal-history/`；证据沿用摸底评估的“学习者原话摘录”格式；`learn curriculum goal show/set`（set 需要该课程的进行中 Session）；目标课程无目标卡时拒绝提交大纲；教材首页“学习目标”段与学习首页目标行。

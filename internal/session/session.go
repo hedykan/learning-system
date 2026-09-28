@@ -275,6 +275,11 @@ func End(ctx context.Context, root string, provider model.Provider, opts EndOpti
 		if err != nil {
 			return EndResult{}, err
 		}
+		if card := opts.Assessment.GoalCard; card != nil {
+			if _, err := curriculum.SaveGoal(root, active.Curriculum, *card, "assessment", active.ID, now); err != nil {
+				return EndResult{}, err
+			}
+		}
 	}
 	if active.Curriculum != "" && active.Kind != "baseline" {
 		if err := curriculum.RecordSession(root, active.Curriculum, active.ID, now); err != nil {

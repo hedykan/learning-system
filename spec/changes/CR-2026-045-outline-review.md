@@ -1,7 +1,7 @@
 ---
 id: CR-2026-045
 title: "草案评审与目标覆盖检查"
-status: accepted
+status: implemented
 target_version: v0.2.1
 created: 2026-09-28
 ---
@@ -31,3 +31,5 @@ created: 2026-09-28
 ## 决策
 
 2026-09-28 接受，排入 v0.2.1。
+
+2026-09-28 实现：条目 `serves`，提交时校验关注点存在；`learn curriculum outline review [--json]`（为什么学、先修、概念、服务的关注点、证据提示、资料、未覆盖关注点、likely_known、是否可确认）；目标课程确认需目标卡、叶子条目都有 why、关注点全覆盖。

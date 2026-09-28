@@ -1,7 +1,7 @@
 ---
 id: CR-2026-046
 title: "资料选择理由与面向目标的搜索"
-status: accepted
+status: implemented
 target_version: v0.2.1
 created: 2026-09-28
 ---
@@ -31,3 +31,5 @@ v0.2 e2e 中 Agent 挂了 5 份资料，但选择理由没有记录；学习者�
 ## 决策
 
 2026-09-28 接受，排入 v0.2.1。
+
+2026-09-28 实现：`source attach --why --serves`，重新挂载同一位置时更新理由；`next`、评审与教材首页显示理由；Skill 规定由目标卡构造搜索并优先匹配学习者技术栈的资料。

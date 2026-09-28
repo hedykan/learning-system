@@ -523,6 +523,21 @@ func renderCurriculum(in Inputs, id string) string {
 	if o := in.Outlines[id]; o.TypeOf() == curriculum.Synthesized {
 		b.WriteString(in.t("> 这门课程由 Agent 根据学习目标组织，条目的顺序与来源都记录在下方；没有原始资料的条目是 AI 综合的内容。\n\n"))
 	}
+	if g, ok := in.Goals[id]; ok {
+		b.WriteString(in.t("## 学习目标\n\n"))
+		for _, row := range []struct {
+			label string
+			item  *curriculum.GoalItem
+		}{{"要达成", g.Outcome}, {"用在哪里", g.Context}, {"已有基础", g.Background}, {"时间与深度", g.Constraints}, {"怎样算学会", g.SuccessCriteria}} {
+			if row.item != nil {
+				fmt.Fprintf(&b, in.t("- %s：%s（「%s」）\n"), in.t(row.label), row.item.Text, row.item.Evidence)
+			}
+		}
+		for _, f := range g.Focus {
+			fmt.Fprintf(&b, in.t("- 关注点 `%s`：%s（「%s」）\n"), f.ID, f.Text, f.Evidence)
+		}
+		b.WriteString("\n")
+	}
 	b.WriteString(in.t("## 教材位置\n\n"))
 	fmt.Fprintf(&b, in.t("- 章节：%s\n- 小节：%s\n- 当前概念：%s\n"), in.orNone(pos.Chapter), in.orNone(pos.Section), in.orNone(pos.CurrentConcept))
 	if pos.Node != "" {
@@ -557,9 +572,26 @@ func renderCurriculum(in Inputs, id string) string {
 			if len(s.Prerequisites) > 0 {
 				fmt.Fprintf(&b, in.t("%s  - 先修：%s\n"), indent, strings.Join(s.Prerequisites, in.t("、")))
 			}
+			if len(s.Serves) > 0 {
+				var focus []string
+				for _, fid := range s.Serves {
+					label := fid
+					for _, f := range in.Goals[id].Focus {
+						if f.ID == fid {
+							label = f.Text
+						}
+					}
+					focus = append(focus, label)
+				}
+				fmt.Fprintf(&b, in.t("%s  - 服务于：%s\n"), indent, strings.Join(focus, in.t("、")))
+			}
 			for _, a := range in.Resources[id].Attachments {
 				if a.Node == s.ID {
-					fmt.Fprintf(&b, in.t("%s  - 资料：%s %s\n"), strings.Repeat("  ", s.Depth-1), in.resourceTitle(a.Locator.Resource), a.Locator.Label(in.Lang))
+					line := fmt.Sprintf(in.t("%s  - 资料：%s %s"), strings.Repeat("  ", s.Depth-1), in.resourceTitle(a.Locator.Resource), a.Locator.Label(in.Lang))
+					if a.Why != "" {
+						line += in.t("——") + a.Why
+					}
+					b.WriteString(line + "\n")
 				}
 			}
 		}

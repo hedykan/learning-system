@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.2.0"
+const Version = "0.2.1"
 
 type App struct {
 	Out      io.Writer
@@ -344,6 +344,7 @@ func (a *App) curriculumCommand(explicitVault *string) *cobra.Command {
 	cmd.AddCommand(a.curriculumMarkCommand(explicitVault, "complete", "completed", "Mark an outline entry as completed"))
 	cmd.AddCommand(a.curriculumMarkCommand(explicitVault, "skip", "skipped", "Mark an outline entry as deliberately skipped"))
 	cmd.AddCommand(a.proposalCommands(explicitVault)...)
+	cmd.AddCommand(a.goalCommand(explicitVault))
 	return cmd
 }
 
@@ -1277,7 +1278,7 @@ func (a *App) curriculumOutlineCommand(explicitVault *string) *cobra.Command {
 		},
 	}
 	history.Flags().BoolVar(&asJSON, "json", false, "output JSON")
-	cmd.AddCommand(show, set, confirm, history)
+	cmd.AddCommand(show, set, confirm, history, a.outlineReviewCommand(explicitVault))
 	return cmd
 }
 

@@ -72,6 +72,9 @@ func renderHome(in Inputs) string {
 	default:
 		pos := in.Positions[in.Active]
 		fmt.Fprintf(&b, in.t("- 教材：%s\n"), link(CurriculumIndexFile(in.Active, in.Titles[in.Active]), in.Titles[in.Active]))
+		if g, ok := in.Goals[in.Active]; ok {
+			fmt.Fprintf(&b, in.t("- 目标：%s\n"), g.Outcome.Text)
+		}
 		where := strings.Trim(strings.Join([]string{pos.Chapter, pos.Section}, " / "), " /")
 		if where == "" {
 			where = in.t("尚未设定")

@@ -43,6 +43,11 @@ var en = map[string]string{
 	"%s %s 涉及的概念已经掌握（%s），先快速检验一次，通过即可标记为已掌握": "the concepts of %s %s are already stable (%s); check them quickly and mark the entry as known if they hold",
 	"快速检验已掌握的 %s %s": "quickly check %s %s, which you already know", "（已在其他课程掌握）": " (already mastered elsewhere)",
 
+	// Intake (v0.2.1).
+	"## 学习目标\n\n": "## Learning goal\n\n", "- %s：%s（「%s」）\n": "- %s: %s (\"%s\")\n", "要达成": "Outcome", "用在哪里": "Context",
+	"已有基础": "Background", "时间与深度": "Time and depth", "怎样算学会": "Done when", "- 关注点 `%s`：%s（「%s」）\n": "- Focus `%s`: %s (\"%s\")\n",
+	"%s  - 服务于：%s\n": "%s  - Serves: %s\n", "——": " — ", "- 目标：%s\n": "- Goal: %s\n", "%s  - 资料：%s %s": "%s  - Resource: %s %s",
+
 	// Resources (CR-2026-027).
 	"%s  - 资料：%s %s\n": "%s  - Resource: %s %s\n", "\n## 资料\n\n": "\n## Resources\n\n", "- %s（主资料）\n": "- %s (primary)\n",
 

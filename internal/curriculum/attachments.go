@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"unicode/utf8"
 
 	"github.com/hedykan/learning-system/internal/fsutil"
 	"github.com/hedykan/learning-system/internal/i18n"
@@ -31,6 +32,9 @@ type ResourceEntry struct {
 type Attachment struct {
 	Node    string          `yaml:"node" json:"node"`
 	Locator locator.Locator `yaml:"locator" json:"locator"`
+	// Why the resource was chosen and which goal focus it serves (CR-2026-046).
+	Why    string `yaml:"why,omitempty" json:"why,omitempty"`
+	Serves string `yaml:"serves,omitempty" json:"serves,omitempty"`
 }
 
 // NodeResource is one resource position of an outline entry, for learners
@@ -42,6 +46,7 @@ type NodeResource struct {
 	Primary  bool            `json:"primary"`
 	Locator  locator.Locator `json:"locator"`
 	Label    string          `json:"label"`
+	Why      string          `json:"why,omitempty"`
 }
 
 func resourceSetPath(root, id string) string {
@@ -75,6 +80,24 @@ func saveResourceSet(root, id string, set ResourceSet) error {
 // Attach places a resource locator on a confirmed outline entry. An empty
 // locator resource means the curriculum's own material.
 func Attach(root, id, node string, loc locator.Locator) (NodeResource, error) {
+	return AttachWith(root, id, node, loc, "", "")
+}
+
+// AttachWith is Attach with the reason for choosing the resource and the
+// goal focus it serves.
+func AttachWith(root, id, node string, loc locator.Locator, why, serves string) (NodeResource, error) {
+	if utf8.RuneCountInString(why) > 120 {
+		return NodeResource{}, fmt.Errorf("--why must be at most 120 characters")
+	}
+	if serves != "" {
+		goal, ok, err := LoadGoal(root, id)
+		if err != nil {
+			return NodeResource{}, err
+		}
+		if !ok || !goal.HasFocus(serves) {
+			return NodeResource{}, fmt.Errorf("--serves %q is not a focus of the goal card", serves)
+		}
+	}
 	o, err := LoadOutline(root, id)
 	if err != nil {
 		return NodeResource{}, err
@@ -106,12 +129,14 @@ func Attach(root, id, node string, loc locator.Locator) (NodeResource, error) {
 	if !ref.Primary && !hasResource(set, loc.Resource) {
 		set.Resources = append(set.Resources, ResourceEntry{ID: loc.Resource, Role: "supplementary"})
 	}
-	a := Attachment{Node: node, Locator: loc}
-	exists := false
-	for _, e := range set.Attachments {
-		exists = exists || e == a
+	a := Attachment{Node: node, Locator: loc, Why: why, Serves: serves}
+	replaced := false
+	for i, e := range set.Attachments {
+		if e.Node == a.Node && e.Locator == a.Locator {
+			set.Attachments[i], replaced = a, true // restating updates the reason
+		}
 	}
-	if !exists {
+	if !replaced {
 		set.Attachments = append(set.Attachments, a)
 	}
 	if err := saveResourceSet(root, id, set); err != nil {
@@ -190,7 +215,9 @@ func NodeResources(root, id, node, lang string) ([]NodeResource, error) {
 			out = append(out, NodeResource{Resource: a.Locator.Resource, Locator: a.Locator, Label: a.Locator.Label(lang)})
 			continue
 		}
-		out = append(out, nodeResource(ref, a.Locator, lang))
+		r := nodeResource(ref, a.Locator, lang)
+		r.Why = a.Why
+		out = append(out, r)
 	}
 	return out, nil
 }

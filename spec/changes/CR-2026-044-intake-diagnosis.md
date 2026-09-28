@@ -1,7 +1,7 @@
 ---
 id: CR-2026-044
 title: "入学诊断：摸底先于建课，并影响课程设计"
-status: accepted
+status: implemented
 target_version: v0.2.1
 created: 2026-09-28
 ---
@@ -37,3 +37,5 @@ created: 2026-09-28
 ## 决策
 
 2026-09-28 接受，排入 v0.2.1。
+
+2026-09-28 实现：评估 `goal_card` 与发现项 `concepts`；摸底可在大纲确认前完成（`recommended_entry.node` 可空，原本就未强制）；`internal/intake` 计算条目证据提示与 `likely_known`（评估为已有知识或模型中 stable，且无缺口或误解），只提示不改大纲。

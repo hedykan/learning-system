@@ -31,6 +31,8 @@ type Node struct {
 	Why           string   `yaml:"why,omitempty" json:"why,omitempty"`
 	Prerequisites []string `yaml:"prerequisites,omitempty" json:"prerequisites,omitempty"`
 	Concepts      []string `yaml:"concepts,omitempty" json:"concepts,omitempty"`
+	// Serves lists the goal card focus ids the entry serves (CR-2026-045).
+	Serves []string `yaml:"serves,omitempty" json:"serves,omitempty"`
 }
 
 // Where is the entry's position as a locator, from pages or the locator.
@@ -213,6 +215,14 @@ func SetOutline(root, id string, data []byte, dryRun bool) (Outline, error) {
 	}
 	if m, err := LoadManifest(root, id); err == nil && m.Kind == "goal" {
 		in.Type = Synthesized
+		if _, ok, err := LoadGoal(root, id); err != nil {
+			return Outline{}, err
+		} else if !ok {
+			return Outline{}, fmt.Errorf("curriculum %s has no goal card yet: run the intake interview (a baseline session with goal_card, or learn curriculum goal set) before drafting the outline", id)
+		}
+	}
+	if err := checkServes(root, id, in); err != nil {
+		return Outline{}, err
 	}
 	if err := in.Validate(); err != nil {
 		return Outline{}, err
@@ -251,6 +261,9 @@ func ConfirmOutline(root, id string) (Outline, error) {
 		return Outline{}, fmt.Errorf("curriculum %s has no outline to confirm", id)
 	}
 	if err := o.Validate(); err != nil {
+		return Outline{}, err
+	}
+	if err := ReadyToConfirm(root, id, o); err != nil {
 		return Outline{}, err
 	}
 	o.Status = "confirmed"

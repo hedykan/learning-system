@@ -124,6 +124,20 @@ learn source check [curriculum] [--json]
 - `source check` 报告失效的定位，以及外部课程中没有任何资料位置的条目（`unsourced`）。
 - 文件夹资料按自然顺序读取（`ch2` 在 `ch10` 前）。
 
+## 入学（v0.2.1）
+
+```bash
+learn curriculum goal show [id] [--json]
+learn curriculum goal set [id] --file <path|-> [--json]
+learn curriculum outline review [id] [--json]
+learn source attach <node> <source> <kind> <value> [--why <text>] [--serves <focus-id>]
+```
+
+- 目标卡字段 `outcome`（必填）、`context`、`background`、`constraints`、`success_criteria`，各为 `{"text", "evidence"}`；`focus` 为 `{"id", "text", "evidence"}` 列表。`evidence` 必须是学习者原话摘录。来源：摸底评估的 `goal_card`，或 `goal set`（证据对照该课程进行中的 Session）。每次修改保存旧版本到 `goal-history/`。
+- 评估发现可带 `concepts`；`outline review` 输出每个条目的 `hints`（`finding` 为 existing_knowledge、prerequisite_gap、possible_misconception，以及模型中的 `state`）、资料、`uncovered_focus`、`likely_known` 与 `ready_to_confirm`。提示不修改大纲。
+- 大纲条目 `serves` 必须是目标卡中的关注点；目标课程 `outline confirm` 要求目标卡存在、每个叶子条目有 `why`、每个关注点至少被一个条目 `serves`，否则列出缺项。
+- `source attach --why` 至多 120 字，`--serves` 必须是目标卡中的关注点；重新挂载同一位置时更新理由。
+
 ## Curriculum Builder（v0.2）
 
 ```bash
