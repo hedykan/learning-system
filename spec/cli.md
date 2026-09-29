@@ -124,6 +124,15 @@ learn source check [curriculum] [--json]
 - `source check` 报告失效的定位，以及外部课程中没有任何资料位置的条目（`unsourced`）。
 - 文件夹资料按自然顺序读取（`ch2` 在 `ch10` 前）。
 
+## 多个学习库（v0.2.2）
+
+```bash
+learn vaults [dir] [--json]
+learn --vault <path> <command> ...
+```
+
+`vaults` 列出 `dir`（缺省为当前目录）本身及其下两层中的学习库，不进入学习库内部继续查找，跳过隐藏目录。每个库输出路径、名称、界面语言、当前课程、课程列表（ID、标题、类型、资料种类、目录状态、已完成与总的叶子条目数，跳过计入已完成）、进行中的 Session 与今天到期的复习数；读取失败的库带 `error`。只读。选定库后，其余命令用全局参数 `--vault` 指定。
+
 ## 入学（v0.2.1）
 
 ```bash

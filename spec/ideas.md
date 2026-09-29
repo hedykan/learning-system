@@ -40,6 +40,7 @@
 | IDEA-034 | Obsidian 图谱整理：按层打标签、证据链接收敛、关系类型与单向链接 | implemented | v0.1.8（见 CR-2026-035 至 037） |
 | IDEA-035 | Curriculum Builder：Source-aligned 与 Synthesized 课程、Topic 先修与来源、有证据的课程调整、跨课程复用已学概念（见 [proposals/curriculum-builder.md](./proposals/curriculum-builder.md)） | implemented | v0.2（见 CR-2026-038 至 042） |
 | IDEA-036 | 入学：目标访谈形成目标卡、诊断摸底先于建课并影响课程设计、草案评审与目标覆盖检查、资料选择理由 | implemented | v0.2.1（见 CR-2026-043 至 046） |
+| IDEA-037 | 一个总文件夹管理多个学习库：列出库与课程 | implemented | v0.2.2（见 CR-2026-047）；总文件夹的 AGENTS.md、跨库汇总暂不做 |
 
 ## IDEA-007 初步边界
 

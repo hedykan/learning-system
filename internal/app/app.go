@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.2.1"
+const Version = "0.2.2"
 
 type App struct {
 	Out      io.Writer
@@ -71,6 +71,7 @@ func (a *App) RootCommand() *cobra.Command {
 	root.AddCommand(a.reviewCommand(&explicitVault))
 	root.AddCommand(a.configCommand(&explicitVault))
 	root.AddCommand(a.sourceCommand(&explicitVault))
+	root.AddCommand(a.vaultsCommand())
 	_ = verbose
 	return root
 }
