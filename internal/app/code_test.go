@@ -23,6 +23,10 @@ func codeRepo(t *testing.T, files map[string]string) string {
 		}
 	}
 	gitRun(t, repo, "init", "-q")
+	// No background gc or maintenance: they keep writing to .git after the
+	// commit and race the temp-dir cleanup.
+	gitRun(t, repo, "config", "gc.auto", "0")
+	gitRun(t, repo, "config", "maintenance.auto", "false")
 	gitRun(t, repo, "add", "-A")
 	gitRun(t, repo, "commit", "-q", "-m", "init")
 	return repo
