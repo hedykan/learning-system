@@ -1,12 +1,13 @@
 package source
 
 import (
-	"bytes"
 	"fmt"
 	"io/fs"
-	"os/exec"
 	"path"
 	"strings"
+
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 
 	"github.com/hedykan/learning-system/internal/locator"
 )
@@ -61,23 +62,34 @@ func codeFile(repo string, loc locator.Locator) ([]byte, error) {
 	if why := ExcludedPath(rel); why != "" {
 		return nil, fmt.Errorf("%s is not readable: %s", rel, why)
 	}
-	cmd := exec.Command("git", "-C", repo, "show", commit+":"+rel)
-	var out, errOut bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errOut
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("%s does not exist at commit %s", rel, commit[:min(7, len(commit))])
+	missing := fmt.Errorf("%s does not exist at commit %s", rel, commit[:min(7, len(commit))])
+	r, err := git.PlainOpen(repo)
+	if err != nil {
+		return nil, fmt.Errorf("open project: %w", err)
 	}
-	head := out.Bytes()
-	if len(head) > 8000 {
-		head = head[:8000]
+	hash, err := r.ResolveRevision(plumbing.Revision(commit))
+	if err != nil {
+		return nil, missing
 	}
-	if bytes.IndexByte(head, 0) >= 0 {
-		return nil, fmt.Errorf("%s is not readable: binary file", rel)
+	c, err := r.CommitObject(*hash)
+	if err != nil {
+		return nil, missing
 	}
-	if out.Len() > 4<<20 {
+	file, err := c.File(rel)
+	if err != nil {
+		return nil, missing
+	}
+	if file.Size > 4<<20 {
 		return nil, fmt.Errorf("%s is not readable: larger than 4 MB", rel)
 	}
-	return out.Bytes(), nil
+	if bin, err := file.IsBinary(); err == nil && bin {
+		return nil, fmt.Errorf("%s is not readable: binary file", rel)
+	}
+	text, err := file.Contents()
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", rel, err)
+	}
+	return []byte(text), nil
 }
 
 var excludedDirs = map[string]string{
@@ -162,22 +174,27 @@ type GitRevision struct {
 // ProjectRevision reads a Git project's HEAD, branch and working-tree state.
 // root must be the top of the work tree.
 func ProjectRevision(root string) (GitRevision, error) {
-	git := func(args ...string) (string, error) {
-		out, err := exec.Command("git", append([]string{"-C", root}, args...)...).Output()
-		return strings.TrimSpace(string(out)), err
-	}
-	top, err := git("rev-parse", "--show-toplevel")
+	r, err := git.PlainOpenWithOptions(root, &git.PlainOpenOptions{DetectDotGit: true})
 	if err != nil {
 		return GitRevision{}, fmt.Errorf("%s is not a Git project", root)
 	}
-	if !samePath(top, root) {
+	wt, err := r.Worktree()
+	if err != nil {
+		return GitRevision{}, fmt.Errorf("%s is not a Git work tree", root)
+	}
+	if top := wt.Filesystem.Root(); !samePath(top, root) {
 		return GitRevision{}, fmt.Errorf("give the project root %s, not a folder inside it", top)
 	}
-	commit, err := git("rev-parse", "HEAD")
+	head, err := r.Head()
 	if err != nil {
 		return GitRevision{}, fmt.Errorf("the project has no commit yet")
 	}
-	branch, _ := git("rev-parse", "--abbrev-ref", "HEAD")
-	status, _ := exec.Command("git", "--no-optional-locks", "-C", root, "status", "--porcelain").Output()
-	return GitRevision{Commit: commit, Branch: branch, Dirty: len(bytes.TrimSpace(status)) > 0}, nil
+	rev := GitRevision{Commit: head.Hash().String(), Branch: "HEAD"}
+	if head.Name().IsBranch() {
+		rev.Branch = head.Name().Short()
+	}
+	if st, err := wt.Status(); err == nil {
+		rev.Dirty = !st.IsClean()
+	}
+	return rev, nil
 }

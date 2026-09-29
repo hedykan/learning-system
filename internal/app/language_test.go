@@ -167,10 +167,12 @@ func gitRun(t *testing.T, root string, args ...string) string {
 func TestGitReminderWhenAutoCommitFails(t *testing.T) {
 	c := newCLI(t)
 	c.run("", false, "init", c.root)
-	hook := filepath.Join(c.root, ".git", "hooks", "pre-commit")
-	if err := os.WriteFile(hook, []byte("#!/bin/sh\nexit 1\n"), 0o755); err != nil {
+	// Make .git unwritable, as an Agent sandbox does.
+	objects := filepath.Join(c.root, ".git", "objects")
+	if err := os.Chmod(objects, 0o555); err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { os.Chmod(objects, 0o755) })
 	c.learnEnglish()
 	home := read(t, filepath.Join(c.root, "README.md"))
 	if !strings.Contains(home, "## ⚠ 学习记录还没有保存到 Git") || !strings.Contains(home, "最近一次提交：从未提交") {
@@ -180,7 +182,7 @@ func TestGitReminderWhenAutoCommitFails(t *testing.T) {
 	if !strings.Contains(status, `"git_auto_commit": "failed"`) || strings.Contains(status, `"git_uncommitted": 0`) {
 		t.Fatalf("status: %s", status)
 	}
-	if err := os.Remove(hook); err != nil {
+	if err := os.Chmod(objects, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	c.run("", false, "commit")

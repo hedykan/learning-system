@@ -124,6 +124,10 @@ learn source check [curriculum] [--json]
 - `source check` 报告失效的定位，以及外部课程中没有任何资料位置的条目（`unsourced`）。
 - 文件夹资料按自然顺序读取（`ch2` 在 `ch10` 前）。
 
+## 内嵌 Git（v0.2.3）
+
+所有 Git 操作由内嵌的 go-git 完成，不需要安装 `git` 命令。提交身份依次取：`GIT_AUTHOR_*` / `GIT_COMMITTER_*` 环境变量、学习库仓库配置、用户全局 Git 配置，最后回退为 `Learning OS <learn@localhost>`。新学习库默认分支为 `main`。go-git 不执行 Git 钩子。
+
 ## 多个学习库（v0.2.2）
 
 ```bash

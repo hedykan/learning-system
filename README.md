@@ -105,7 +105,8 @@ AI 可以重新判断你是否真正理解了一个概念，但已经发生过�
 
 ## 手动安装
 
-需要 Git。
+不需要额外安装 Git：学习记录的版本管理已内嵌在 `learn` 里。学习库仍是标准的 Git 仓库，想推送到远程备份时再用你熟悉的 Git 工具即可。
+
 
 ### 下载二进制（不需要 Go）
 
@@ -201,9 +202,7 @@ learn --vault ~/Learning/math next
 
 你正在为用户安装 Personal Learning OS。按顺序执行，每步用工具确认成功再继续；除必要选择外不要打断用户。
 
-1. 确认 `git` 可用。缺少则告知用户先安装。
-
-2. 安装 Runtime：
+1. 安装 Runtime（不需要预先安装 Git）：
 
    - 有 Go 1.23 及以上时：
 
@@ -213,7 +212,7 @@ learn --vault ~/Learning/math next
 
    - 没有 Go 时：按「手动安装 → 下载二进制」从最新 Release 下载与系统、架构对应的文件，放到 PATH 中。
 
-3. 运行：
+2. 运行：
 
    ```bash
    learn version
@@ -223,7 +222,7 @@ learn --vault ~/Learning/math next
 
    若命令未找到，提示用户把 `go env GOPATH` 下的 `bin` 加入 PATH。
 
-4. 问用户 Vault 放在哪里，默认：
+3. 问用户 Vault 放在哪里，默认：
 
    ```text
    ~/Learning
@@ -235,7 +234,7 @@ learn --vault ~/Learning/math next
    learn init <路径>
    ```
 
-5. `cd` 进该目录，运行：
+4. `cd` 进该目录，运行：
 
    ```bash
    learn status
@@ -243,7 +242,7 @@ learn --vault ~/Learning/math next
 
    确认可用。
 
-6. 告诉用户安装完成，可以给一个学习目标、一本教材（路径或网址），或者两者都给。
+5. 告诉用户安装完成，可以给一个学习目标、一本教材（路径或网址），或者两者都给。
 
 之后完全遵循 Vault 内 `.agents/skills/learning-os/SKILL.md`（Claude 为 `.claude/…`）的指引，不要凭记忆操作 `learn`。
 
