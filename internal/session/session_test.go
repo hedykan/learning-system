@@ -226,3 +226,28 @@ func runGit(t *testing.T, root string, args ...string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+// Sessions started at the same instant (a review right after its lesson, or
+// a fixed LEARN_NOW) get distinct conversations.
+func TestSameInstantStartsDoNotCollide(t *testing.T) {
+	root := initVault(t)
+	now := time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC)
+	lesson, err := session.Start(root, session.StartOptions{Kind: "lesson", SkipBaseline: true}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := session.Append(root, "user", "学习课的话", now); err != nil {
+		t.Fatal(err)
+	}
+	review, err := session.Start(root, session.StartOptions{Kind: "review"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if review.ID == lesson.ID || review.Suspended != lesson.ID {
+		t.Fatalf("lesson %+v, review %+v", lesson, review)
+	}
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(lesson.Conversation)))
+	if err != nil || !strings.Contains(string(data), "学习课的话") {
+		t.Fatalf("lesson conversation overwritten: %v\n%s", err, data)
+	}
+}

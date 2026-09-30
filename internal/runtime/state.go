@@ -29,8 +29,21 @@ type ActiveSession struct {
 type State struct {
 	SchemaVersion int            `json:"schema_version"`
 	ActiveSession *ActiveSession `json:"active_session"`
-	LastSession   string         `json:"last_session,omitempty"`
-	UpdatedAt     string         `json:"updated_at"`
+	// Suspended is the lesson a review session interrupted; it becomes the
+	// active session again when the review ends (CR-2026-049). One level only.
+	Suspended   *ActiveSession `json:"suspended_session,omitempty"`
+	LastSession string         `json:"last_session,omitempty"`
+	UpdatedAt   string         `json:"updated_at"`
+}
+
+// Resume ends the active session: the suspended lesson, if any, becomes
+// active again. It returns the resumed session id.
+func (s *State) Resume() string {
+	s.ActiveSession, s.Suspended = s.Suspended, nil
+	if s.ActiveSession == nil {
+		return ""
+	}
+	return s.ActiveSession.ID
 }
 
 func NewState(now time.Time) State {

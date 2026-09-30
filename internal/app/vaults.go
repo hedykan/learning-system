@@ -39,6 +39,7 @@ type vaultSummary struct {
 	Active        string            `json:"active_curriculum,omitempty"`
 	Curricula     []vaultCurriculum `json:"curricula"`
 	ActiveSession *vaultSession     `json:"active_session,omitempty"`
+	Suspended     *vaultSession     `json:"suspended_session,omitempty"`
 	DueReviews    int               `json:"due_reviews"`
 	Error         string            `json:"error,omitempty"`
 }
@@ -110,6 +111,9 @@ func summarizeVault(root string) vaultSummary {
 	}
 	if st, err := runtimeState.Load(root); err == nil && st.ActiveSession != nil {
 		s.ActiveSession = &vaultSession{Kind: st.ActiveSession.Kind, Curriculum: st.ActiveSession.Curriculum}
+		if p := st.Suspended; p != nil {
+			s.Suspended = &vaultSession{Kind: p.Kind, Curriculum: p.Curriculum}
+		}
 	}
 	today := clock.Date(clock.Now())
 	for _, sch := range m.Schedules() {
@@ -173,6 +177,9 @@ func (a *App) vaultsCommand() *cobra.Command {
 				}
 				if v.ActiveSession != nil {
 					fmt.Fprintf(w, "  active session: %s (%s)\n", v.ActiveSession.Kind, v.ActiveSession.Curriculum)
+				}
+				if v.Suspended != nil {
+					fmt.Fprintf(w, "  suspended session: %s (%s)\n", v.Suspended.Kind, v.Suspended.Curriculum)
 				}
 				if v.DueReviews > 0 {
 					fmt.Fprintf(w, "  due reviews: %d\n", v.DueReviews)

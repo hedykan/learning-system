@@ -124,6 +124,10 @@ learn source check [curriculum] [--json]
 - `source check` 报告失效的定位，以及外部课程中没有任何资料位置的条目（`unsourced`）。
 - 文件夹资料按自然顺序读取（`ch2` 在 `ch10` 前）。
 
+## 复习课插入学习课（v0.2.4）
+
+学习课或练习课进行中，只有 `session start --kind review` 可以开新课：当前课移到 `.learning/state.json` 的 `suspended_session`，`start --json` 输出 `suspended`。复习课 `end` 或 `abort` 后被挂起的课恢复为进行中，输出 `resumed`。最多挂起一层；复习课与摸底不能被打断。`append`、`checkpoint`、`turns` 始终作用于进行中的课；被挂起的课不能 `annotate`。`status --json` 与 `vaults --json` 带 `suspended_session`。
+
 ## 内嵌 Git（v0.2.3）
 
 所有 Git 操作由内嵌的 go-git 完成，不需要安装 `git` 命令。提交身份依次取：`GIT_AUTHOR_*` / `GIT_COMMITTER_*` 环境变量、学习库仓库配置、用户全局 Git 配置，最后回退为 `Learning OS <learn@localhost>`。新学习库默认分支为 `main`。go-git 不执行 Git 钩子。

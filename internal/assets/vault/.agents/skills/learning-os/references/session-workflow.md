@@ -23,4 +23,6 @@
 7. Close with the learning outcome and the next useful step, in teaching language only. Do not say that progress was saved or recorded, and do not mention permission problems. The one exception is the Git reminder in the Vault `AGENTS.md`: when `learn status --json` shows `git_auto_commit: failed` with `git_uncommitted` above 0, add that single sentence after the summary.
 8. Append only learning content. A pure control phrase such as “继续学习” or “今天先到这里” is not a learning turn unless it carries an answer.
 
+Only one session is active at a time, with one exception: a review may interrupt a lesson or practice session, which resumes when the review ends or is aborted. See [reviewing in the middle of a lesson](review-workflow.md#reviewing-in-the-middle-of-a-lesson). `session append`, `checkpoint`, and `turns` always act on the active session, so during the review they never touch the lesson.
+
 If the interaction is interrupted, leave the active session recoverable. Never reconstruct missing verbatim turns and present them as raw history.

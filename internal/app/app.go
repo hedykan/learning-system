@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.2.3"
+const Version = "0.2.4"
 
 type App struct {
 	Out      io.Writer
@@ -191,6 +191,7 @@ func (a *App) configCommand(explicitVault *string) *cobra.Command {
 type statusOutput struct {
 	Vault           string                      `json:"vault"`
 	ActiveSession   *runtimeState.ActiveSession `json:"active_session"`
+	Suspended       *runtimeState.ActiveSession `json:"suspended_session,omitempty"`
 	CurrentLearning string                      `json:"current_learning,omitempty"`
 	Position        *curriculum.Position        `json:"position,omitempty"`
 	Baseline        assessment.Status           `json:"baseline"`
@@ -226,7 +227,7 @@ func (a *App) statusCommand(explicitVault *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out := statusOutput{Vault: root, ActiveSession: state.ActiveSession, CurrentLearning: cfg.Curriculum.Active, LastSession: state.LastSession}
+			out := statusOutput{Vault: root, ActiveSession: state.ActiveSession, Suspended: state.Suspended, CurrentLearning: cfg.Curriculum.Active, LastSession: state.LastSession}
 			if cfg.Curriculum.Active != "" {
 				position, err := curriculum.LoadPosition(root, cfg.Curriculum.Active)
 				if err != nil {
@@ -298,12 +299,21 @@ func (a *App) statusCommand(explicitVault *string) *cobra.Command {
 	return cmd
 }
 
+func printResumed(w io.Writer, id string) {
+	if id != "" {
+		fmt.Fprintf(w, "Resumed: %s\n", id)
+	}
+}
+
 func writeHumanStatus(w io.Writer, out statusOutput) {
 	fmt.Fprintf(w, "Vault: %s\n\n", out.Vault)
 	if out.ActiveSession == nil {
 		fmt.Fprintln(w, "Active Session: none")
 	} else {
 		fmt.Fprintf(w, "Active Session: %s (%s)\n", out.ActiveSession.ID, valueOrNone(out.ActiveSession.Kind))
+	}
+	if out.Suspended != nil {
+		fmt.Fprintf(w, "Suspended Session: %s (%s), resumes when the review ends\n", out.Suspended.ID, valueOrNone(out.Suspended.Kind))
 	}
 	fmt.Fprintf(w, "Current Learning: %s\n", valueOrNone(out.CurrentLearning))
 	if out.CurrentLearning != "" {
@@ -701,6 +711,9 @@ func (a *App) sessionStartCommand(explicitVault *string) *cobra.Command {
 				return writeJSON(cmd.OutOrStdout(), result)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Started %s (%s)\nConversation: %s\n", result.ID, result.Kind, result.Conversation)
+			if result.Suspended != "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "Suspended: %s (resumes when this review ends)\n", result.Suspended)
+			}
 			return nil
 		},
 	}
@@ -797,6 +810,7 @@ func (a *App) sessionEndCommand(explicitVault *string) *cobra.Command {
 				return writeJSON(cmd.OutOrStdout(), result)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Completed %s (%s)\nSession: %s\nProjections: %s\nGit: %s\n", result.ID, result.Kind, result.Session, valueOrNone(result.Projections), result.Git)
+			printResumed(cmd.OutOrStdout(), result.Resumed)
 			return nil
 		},
 	}
@@ -1004,6 +1018,7 @@ func (a *App) sessionAbortCommand(explicitVault *string) *cobra.Command {
 				return writeJSON(cmd.OutOrStdout(), result)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Aborted %s\nSession: %s\nGit: %s\n", result.ID, result.Session, result.Git)
+			printResumed(cmd.OutOrStdout(), result.Resumed)
 			return nil
 		},
 	}

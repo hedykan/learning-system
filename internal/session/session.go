@@ -31,6 +31,7 @@ type StartResult struct {
 	StartedAt    string `json:"started_at"`
 	Kind         string `json:"kind"`
 	Depth        string `json:"depth,omitempty"`
+	Suspended    string `json:"suspended,omitempty"`
 }
 
 type EndResult struct {
@@ -44,6 +45,7 @@ type EndResult struct {
 	Record       string `json:"record,omitempty"`
 	Projections  string `json:"projections,omitempty"`
 	Git          string `json:"git"`
+	Resumed      string `json:"resumed,omitempty"`
 }
 
 type StartOptions struct {
@@ -68,11 +70,11 @@ func Start(root string, opts StartOptions, now time.Time) (StartResult, error) {
 	if err != nil {
 		return StartResult{}, err
 	}
-	if state.ActiveSession != nil {
-		return StartResult{}, fmt.Errorf("session %s is already active", state.ActiveSession.ID)
+	suspended, err := interrupt(state, opts.Kind)
+	if err != nil {
+		return StartResult{}, err
 	}
-	id := "session-" + now.UTC().Format("20060102-150405.000000000")
-	rel := filepath.ToSlash(filepath.Join("Conversations", id+".md"))
+	id, rel := newSessionID(root, now)
 	cfg, err := config.Load(root)
 	if err != nil {
 		return StartResult{}, err
@@ -130,12 +132,47 @@ func Start(root string, opts StartOptions, now time.Time) (StartResult, error) {
 	if err := fsutil.WriteFileAtomic(filepath.Join(root, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
 		return StartResult{}, err
 	}
-	state.ActiveSession = active
+	state.ActiveSession, state.Suspended = active, suspended
 	state.UpdatedAt = now.UTC().Format(time.RFC3339Nano)
 	if err := runtimeState.Save(root, state); err != nil {
 		return StartResult{}, err
 	}
-	return StartResult{ID: id, Conversation: rel, StartedAt: active.StartedAt, Kind: active.Kind, Depth: active.Depth}, nil
+	result := StartResult{ID: id, Conversation: rel, StartedAt: active.StartedAt, Kind: active.Kind, Depth: active.Depth}
+	if suspended != nil {
+		result.Suspended = suspended.ID
+	}
+	return result, nil
+}
+
+// newSessionID names a session after its start time, moving on by a
+// nanosecond while the name is taken: a review started right after its lesson
+// (or any start under a fixed LEARN_NOW) must not overwrite a conversation.
+func newSessionID(root string, now time.Time) (string, string) {
+	for t := now.UTC(); ; t = t.Add(time.Nanosecond) {
+		id := "session-" + t.Format("20060102-150405.000000000")
+		rel := filepath.ToSlash(filepath.Join("Conversations", id+".md"))
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(rel))); os.IsNotExist(err) {
+			return id, rel
+		}
+	}
+}
+
+// interrupt decides whether a new session may start while one is active: a
+// review may interrupt a lesson or practice session, which is suspended until
+// the review ends (CR-2026-049). It returns the session to suspend.
+func interrupt(state runtimeState.State, kind string) (*runtimeState.ActiveSession, error) {
+	cur := state.ActiveSession
+	switch {
+	case cur == nil:
+		return nil, nil
+	case state.Suspended != nil:
+		return nil, fmt.Errorf("session %s is already active (it interrupted %s); end it first", cur.ID, state.Suspended.ID)
+	case kind != "review":
+		return nil, fmt.Errorf("session %s is already active; only a review (--kind review) can interrupt it", cur.ID)
+	case cur.Kind == "review" || cur.Kind == "baseline":
+		return nil, fmt.Errorf("session %s is already active; a %s session cannot be interrupted", cur.ID, cur.Kind)
+	}
+	return cur, nil
 }
 
 // AppendResult identifies the raw turn that was written.
@@ -286,12 +323,13 @@ func End(ctx context.Context, root string, provider model.Provider, opts EndOpti
 			return EndResult{}, err
 		}
 	}
-	state.ActiveSession = nil
+	resumed := state.Resume()
 	state.LastSession = active.ID
 	state.UpdatedAt = now.UTC().Format(time.RFC3339Nano)
 	if err := runtimeState.Save(root, state); err != nil {
 		return EndResult{}, err
 	}
+	result.Resumed = resumed
 	result.Projections = refreshStatus(root)
 	return commitResult(root, result, "learning: complete "+active.ID)
 }
@@ -563,6 +601,9 @@ func Annotate(root, sessionID string, rec *record.Record, now time.Time) (Checkp
 	if state.ActiveSession != nil && state.ActiveSession.ID == sessionID {
 		return CheckpointResult{}, fmt.Errorf("session %s is active; use checkpoint instead", sessionID)
 	}
+	if state.Suspended != nil && state.Suspended.ID == sessionID {
+		return CheckpointResult{}, fmt.Errorf("session %s is suspended by review %s; end the review, then use checkpoint", sessionID, state.ActiveSession.ID)
+	}
 	if _, err := os.Stat(conversation.Path(root, sessionID)); err != nil {
 		return CheckpointResult{}, fmt.Errorf("session %s has no conversation", sessionID)
 	}
@@ -717,7 +758,7 @@ func Abort(root, reason string, now time.Time) (EndResult, error) {
 	if err != nil {
 		return EndResult{}, err
 	}
-	state.ActiveSession = nil
+	resumed := state.Resume()
 	state.LastSession = active.ID
 	state.UpdatedAt = now.UTC().Format(time.RFC3339Nano)
 	if err := runtimeState.Save(root, state); err != nil {
@@ -725,7 +766,7 @@ func Abort(root, reason string, now time.Time) (EndResult, error) {
 	}
 	result := EndResult{
 		ID: active.ID, Conversation: active.Conversation, Session: sessionRel,
-		Kind: active.Kind, Termination: "aborted", Git: "disabled",
+		Kind: active.Kind, Termination: "aborted", Git: "disabled", Resumed: resumed,
 	}
 	result.Projections = refreshStatus(root)
 	return commitResult(root, result, "learning: abort "+active.ID)

@@ -25,4 +25,15 @@ The Runtime schedules spaced reviews (1, 2, 4, 7, 15, 30, 60 days). You run them
 
    `action_turn` is your question; evidence is the learner's answer after it. A recalled answer in a later session is also retrieval evidence: add a `retrieval` event, and a `stable` state update when the concept already had a developing state.
 
+## Reviewing in the middle of a lesson
+
+When the learner wants to review in the middle of a lesson (they say so, or a frontend opens its review page), do not ask the review questions inside the lesson. Run `learn session start --kind review --json`: the lesson is suspended (`suspended` in the result) and the review gets its own conversation. Append, checkpoint, and end the review as usual; `learn session end` or `learn session abort` then resumes the lesson (`resumed` in the result), and later turns go to the lesson again. Pick the lesson up where it stopped; do not restart it.
+
+Each conversation keeps only its own turns, and no text goes into both. When one reply both closes one session and opens the other, append it in two parts:
+
+1. Switching to the review: append the feedback on the last lesson answer to the lesson, checkpoint the lesson if anything interpretable happened, then start the review and append only the review question to it.
+2. Switching back: append the feedback on the last review answer to the review, end it, then append only the next lesson question to the lesson.
+
+Only one review can interrupt a lesson at a time, and a baseline or a review cannot be interrupted. `learn status --json` shows the suspended lesson as `suspended_session`.
+
 Never mention intervals, schedules, or the Runtime to the learner. Say “先回忆一下上次学的……” instead.
