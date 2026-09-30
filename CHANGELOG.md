@@ -3,6 +3,7 @@
 ## v0.2.4 — 2026-09-30
 
 - 复习课可以插进学习课：学习课或练习课进行中，`learn session start --kind review` 会挂起当前的课，复习课结束或中止后自动恢复，两节课的对话和记录分开保存。`learn status` 与 `learn vaults` 显示被挂起的课。老学习库无需迁移。
+- README「给 AI 代理」：没有 Go 时，Agent 按系统与架构从最新 Release 下载二进制、校验 SHA256 后安装到用户目录（macOS、Linux 用 shell，Windows 用 PowerShell），不需要 sudo。
 - 修复：同一时刻开始的两节课（例如固定 `LEARN_NOW` 时中止后马上重开）会共用 ID，后一节覆盖前一节的对话。
 
 ## v0.2.3 — 2026-09-29

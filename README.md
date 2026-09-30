@@ -210,7 +210,41 @@ learn --vault ~/Learning/math next
      go install github.com/hedykan/learning-system/cmd/learn@latest
      ```
 
-   - 没有 Go 时：按「手动安装 → 下载二进制」从最新 Release 下载与系统、架构对应的文件，放到 PATH 中。
+   - 没有 Go 时：从最新 Release 下载与系统、架构对应的二进制，校验后放到用户目录，不需要 sudo。
+
+     macOS、Linux（Linux 用 `.tar.gz`，不依赖 FUSE）：
+
+     ```bash
+     REPO=hedykan/learning-system BIN="$HOME/.local/bin"
+     TAG=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" | sed 's|.*/tag/||')
+     case "$(uname -s)" in Darwin) OS=macos ;; Linux) OS=linux ;; *) echo "unsupported system"; exit 1 ;; esac
+     case "$(uname -m)" in x86_64|amd64) ARCH=x64 ;; arm64|aarch64) ARCH=arm64 ;; armv7l) ARCH=armv7 ;; i386|i686) ARCH=x86 ;; *) echo "unsupported architecture"; exit 1 ;; esac
+     FILE="learn-$TAG-$OS-$ARCH"; [ "$OS" = linux ] && FILE="$FILE.tar.gz"
+     BASE="https://github.com/$REPO/releases/download/$TAG"
+     mkdir -p "$BIN" && cd "$(mktemp -d)"
+     curl -fsSLO "$BASE/$FILE" && curl -fsSLO "$BASE/SHA256SUMS.txt"
+     grep " $FILE\$" SHA256SUMS.txt > want.txt
+     if command -v sha256sum >/dev/null; then sha256sum -c want.txt; else shasum -a 256 -c want.txt; fi
+     if [ "$OS" = linux ]; then tar -xzf "$FILE" && mv learn "$BIN/learn"; else mv "$FILE" "$BIN/learn"; fi
+     chmod +x "$BIN/learn" && "$BIN/learn" version
+     ```
+
+     Windows（PowerShell）：
+
+     ```powershell
+     $Repo = "hedykan/learning-system"; $Dir = "$env:LOCALAPPDATA\Programs\learn"
+     $Tag = (Invoke-RestMethod "https://api.github.com/repos/$Repo/releases/latest").tag_name
+     $Arch = @{ AMD64 = "x64"; ARM64 = "arm64"; x86 = "x86" }[$env:PROCESSOR_ARCHITECTURE]
+     $File = "learn-$Tag-windows-$Arch.exe"; $Base = "https://github.com/$Repo/releases/download/$Tag"
+     New-Item -ItemType Directory -Force $Dir | Out-Null
+     Invoke-WebRequest "$Base/$File" -OutFile "$Dir\learn.exe"
+     Invoke-WebRequest "$Base/SHA256SUMS.txt" -OutFile "$Dir\SHA256SUMS.txt"
+     $Want = ((Get-Content "$Dir\SHA256SUMS.txt" | Where-Object { $_ -like "* $File" }) -split " ")[0]
+     if ((Get-FileHash "$Dir\learn.exe").Hash -ne $Want.ToUpper()) { throw "checksum mismatch" }
+     & "$Dir\learn.exe" version
+     ```
+
+     校验失败时删除下载的文件并告诉用户，不要继续。沙箱里连不上网时，请用户在自己的终端运行上面的命令，或按「手动安装 → 下载二进制」手动下载。
 
 2. 运行：
 
@@ -218,9 +252,9 @@ learn --vault ~/Learning/math next
    learn version
    ```
 
-   确认输出版本号（如 `learn v0.2.0` 或更高）。
+   确认输出版本号（如 `learn v0.2.4` 或更高）。
 
-   若命令未找到，提示用户把 `go env GOPATH` 下的 `bin` 加入 PATH。
+   若命令未找到：用 `go install` 安装的，把 `go env GOPATH` 下的 `bin` 加入 PATH；下载二进制的，把上面的安装目录（`~/.local/bin` 或 `%LOCALAPPDATA%\Programs\learn`）加入 PATH。修改 shell 配置或系统 PATH 前先征得用户同意；在此之前，本次安装的后续步骤直接用完整路径运行 `learn`。
 
 3. 问用户 Vault 放在哪里，默认：
 
