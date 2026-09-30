@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.3.0 — 2026-10-01
+
+- Agent 驱动层进入核心：`internal/agent` 把原 Python 开发服务器（devserver.py）的职责用 Go 重写——提示词组装、工具定义与调度（工具在进程内直接驱动 CLI 命令树，不再 fork 子进程）、流式模型调用（DeepSeek 及任何兼容 OpenAI 接口的模型）、对话历史与中断修复、复习课与学习课的分离。所有平台从此共用同一位导师。
+- `learn serve [--port] [--static <原型目录>]`：本地应用后端（只监听 127.0.0.1），提供与 devserver.py 相同的 `/api/*`：学习/复习/笔记页的查询接口，聊天、建课、确认大纲、复习出题与判题等动作以 SSE 流式汇报进度。加上 `--static` 即可直接顶替 devserver.py 跑 island 原型。
+- 导师工具新增 `source_list` / `source_add` / `source_attach`：学习者给出教材网址或文件路径，导师把教材导入学习库、按真实章节起草大纲并挂接到条目；网页整站按 sitemap 抓取快照（最多 500 页）。
+- 提示词：要求导师在学习者展示理解、误解或提出好问题的当轮就提交解读记录，笔记与复习题随学习实时生长；goal_set 的目标卡字段写入工具描述。
+
 ## v0.2.4 — 2026-09-30
 
 - 复习课可以插进学习课：学习课或练习课进行中，`learn session start --kind review` 会挂起当前的课，复习课结束或中止后自动恢复，两节课的对话和记录分开保存。`learn status` 与 `learn vaults` 显示被挂起的课。老学习库无需迁移。

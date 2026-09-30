@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.2.4"
+const Version = "0.3.0"
 
 type App struct {
 	Out      io.Writer
