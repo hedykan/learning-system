@@ -192,7 +192,7 @@ func (s *Server) Concept(cid string) map[string]any {
 		return nil
 	}
 	c := mmap(d["concept"])
-	var quotes []any
+	quotes := []any{}
 	seen := map[string]bool{}
 	items := asSlice(c["history"])
 	items = append(items, asSlice(d["events"])...)
@@ -207,7 +207,7 @@ func (s *Server) Concept(cid string) map[string]any {
 			}
 		}
 	}
-	var was []any
+	was := []any{}
 	for _, ch := range asSlice(d["cognitive_changes"]) {
 		if om := mmap(ch)["old_model"]; om != nil {
 			was = append(was, om)
@@ -227,7 +227,7 @@ func (s *Server) Concept(cid string) map[string]any {
 			break
 		}
 	}
-	var related []any
+	related := []any{}
 	for _, r := range asSlice(c["related"]) {
 		related = append(related, mmap(r)["concept"])
 	}
@@ -236,8 +236,8 @@ func (s *Server) Concept(cid string) map[string]any {
 	}
 	return map[string]any{
 		"id": cid, "label": c["label"], "state": stateMap[mstr(d, "state")],
-		"understanding": understanding, "quotes": orEmpty(quotes), "was": orEmpty(was),
-		"related": orEmpty(related), "next": next, "aliases": orEmpty(c["aliases"]),
+		"understanding": understanding, "quotes": quotes, "was": was,
+		"related": related, "next": next, "aliases": orEmpty(c["aliases"]),
 	}
 }
 
