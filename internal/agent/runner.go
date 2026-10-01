@@ -60,9 +60,11 @@ func repair(history []Message) []Message {
 	return history
 }
 
-// RunAgent lets the model work with tools until it replies. When recordReply
-// is set and a session is active, the reply is recorded as a conversation turn.
-func RunAgent(ctx context.Context, tools *Tools, history []Message, emit Emit, recordReply bool) (string, []CallRecord, error) {
+// RunAgent lets the model work with tools until it replies. It returns the
+// grown history (the caller saves it: slice appends do not reach the caller).
+// When recordReply is set and a session is active, the reply is recorded as a
+// conversation turn.
+func RunAgent(ctx context.Context, tools *Tools, history []Message, emit Emit, recordReply bool) (string, []Message, []CallRecord, error) {
 	logs := filepath.Join(tools.Vault, ".learning", "tmp", "app-logs")
 	_ = os.MkdirAll(logs, 0o755)
 	log, _ := os.Create(filepath.Join(logs, time.Now().Format("20060102-150405")+".jsonl"))
@@ -79,14 +81,14 @@ func RunAgent(ctx context.Context, tools *Tools, history []Message, emit Emit, r
 		history[0]["content"] = SystemPrompt(tools.Vault)
 	}
 	history = repair(history)
-	reply, calls, err := run(ctx, tools, history, emit, recordReply, writeLog)
+	reply, history, calls, err := run(ctx, tools, history, emit, recordReply, writeLog)
 	if errors.Is(err, ErrCancelled) {
 		repair(history) // the caller saves the history: leave it valid for the next reply
 	}
-	return reply, calls, err
+	return reply, history, calls, err
 }
 
-func run(ctx context.Context, tools *Tools, history []Message, emit Emit, recordReply bool, writeLog func(map[string]any)) (string, []CallRecord, error) {
+func run(ctx context.Context, tools *Tools, history []Message, emit Emit, recordReply bool, writeLog func(map[string]any)) (string, []Message, []CallRecord, error) {
 	var calls []CallRecord
 	fails := map[string]int{}
 	for range 30 {
@@ -95,7 +97,7 @@ func run(ctx context.Context, tools *Tools, history []Message, emit Emit, record
 			return emit(map[string]any{"type": "alive"})
 		})
 		if err != nil {
-			return "", calls, err
+			return "", history, calls, err
 		}
 		keep := Message{"role": "assistant", "content": answer.Content}
 		if answer.Reasoning != "" {
@@ -119,11 +121,11 @@ func run(ctx context.Context, tools *Tools, history []Message, emit Emit, record
 				}
 			}
 			writeLog(map[string]any{"reply": answer.Content, "usage": answer.Usage})
-			return answer.Content, calls, nil
+			return answer.Content, history, calls, nil
 		}
 		for _, tc := range answer.ToolCalls {
 			if err := emit(map[string]any{"type": "tool", "name": tc.Name}); err != nil {
-				return "", calls, err
+				return "", history, calls, err
 			}
 			var args map[string]any
 			var result toolResult
@@ -146,10 +148,10 @@ func run(ctx context.Context, tools *Tools, history []Message, emit Emit, record
 		if maxFail(fails) >= 4 {
 			// the same step keeps failing: stop instead of guessing on
 			writeLog(map[string]any{"stopped": "repeated tool failures", "fails": fails})
-			return "（这一步连着出错了几次，我先停下。换个说法再试一次，或者告诉我哪里不对。）", calls, nil
+			return "（这一步连着出错了几次，我先停下。换个说法再试一次，或者告诉我哪里不对。）", history, calls, nil
 		}
 	}
-	return "（这一步想得太久了，换个说法再试一次吧。）", calls, nil
+	return "（这一步想得太久了，换个说法再试一次吧。）", history, calls, nil
 }
 
 func truncate(s string, n int) string {

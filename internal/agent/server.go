@@ -84,7 +84,10 @@ func (s *Server) endReview(ctx context.Context, emit Emit) bool {
 			// the runtime wants more, e.g. relations: let the tutor finish it
 			h := loadHistory(s.Vault, "", "review")
 			h = append(h, Message{"role": "user", "content": "[app] The learner left the review screen. Ending the review failed: " + truncate(r.Output, 600) + " Fix it and end the session with session_end. Then reply with one short sentence."})
-			_, _, _ = RunAgent(ctx, s.tools, h, emit, false)
+			_, h2, _, _ := RunAgent(ctx, s.tools, h, emit, false)
+			if h2 != nil {
+				h = h2
+			}
 			saveHistory(s.Vault, "", "review", h)
 			if reviewing(s.Vault) {
 				runCLI(s.Vault, "", "session", "abort", "--reason", "the review could not be ended", "--json")
@@ -329,6 +332,21 @@ func (s *Server) Turns() map[string]any {
 		text := mstr(m, "text")
 		items = append(items, map[string]any{"role": m["role"], "text": text})
 	}
+	if len(items) == 0 {
+		// 课前对话（还没 session_start）：回退到 runner 保存的对话，
+		// 这样应用重启后聊天内容还在。
+		for _, m := range loadHistory(s.Vault, cur, "learn") {
+			text, _ := m["content"].(string)
+			if text == "" || strings.HasPrefix(text, "[app]") {
+				continue
+			}
+			text = strings.TrimPrefix(text, "[recorded when a session starts] ")
+			switch m["role"] {
+			case "user", "assistant":
+				items = append(items, map[string]any{"role": m["role"], "text": text})
+			}
+		}
+	}
 	return map[string]any{"turns": items, "past": past}
 }
 
@@ -354,7 +372,10 @@ func (s *Server) Chat(ctx context.Context, text string, emit Emit) (map[string]a
 	s.endReview(ctx, emit) // the learner is back on the learning page
 	h := loadHistory(s.Vault, "", "learn")
 	h = s.learnerSays(h, text)
-	reply, _, err := RunAgent(ctx, s.tools, h, emit, true)
+	reply, h2, _, err := RunAgent(ctx, s.tools, h, emit, true)
+	if h2 != nil {
+		h = h2
+	}
 	saveHistory(s.Vault, "", "learn", h)
 	if err != nil {
 		return nil, err
@@ -378,8 +399,11 @@ func (s *Server) NewGoal(ctx context.Context, goal string, emit Emit) (map[strin
 			"and ask your first interview question, one question only."},
 	}
 	h = s.learnerSays(h, goal)
-	reply, _, err := RunAgent(ctx, s.tools, h, emit, true)
+	reply, h2, _, err := RunAgent(ctx, s.tools, h, emit, true)
 	s.tools.PendingUser = ""
+	if h2 != nil {
+		h = h2
+	}
 	saveHistory(s.Vault, "", "learn", h) // now under the new course
 	if err != nil {
 		return nil, err
@@ -400,7 +424,10 @@ func (s *Server) ConfirmOutline(ctx context.Context, emit Emit) (map[string]any,
 	h = append(h, Message{"role": "user", "content": "[app] The learner reviewed the draft card and tapped 开始学习, so the app confirmed the outline. If the intake baseline is still open, " +
 		"end it now with its assessment (goal_card included). Then set the position to the first entry you will teach with position_set, " +
 		"start a lesson session on it and begin teaching it in one short message."})
-	reply, _, err := RunAgent(ctx, s.tools, h, emit, true)
+	reply, h2, _, err := RunAgent(ctx, s.tools, h, emit, true)
+	if h2 != nil {
+		h = h2
+	}
 	saveHistory(s.Vault, "", "learn", h)
 	if err != nil {
 		return nil, err
@@ -420,7 +447,10 @@ func (s *Server) ReviewAsk(ctx context.Context, cid, label string, emit Emit) (m
 	}
 	h := loadHistory(s.Vault, "", "review")
 	h = append(h, Message{"role": "user", "content": "[app] The learner opened the review screen. Ask one retrieval question about the concept " + label + " (id " + cid + "), following the review workflow. Reply with the question only, one or two sentences, no greeting."})
-	q, _, err := RunAgent(ctx, s.tools, h, emit, true)
+	q, h2, _, err := RunAgent(ctx, s.tools, h, emit, true)
+	if h2 != nil {
+		h = h2
+	}
 	saveHistory(s.Vault, "", "review", h)
 	if err != nil {
 		return nil, err
@@ -441,7 +471,10 @@ func (s *Server) ReviewAnswer(ctx context.Context, cid, label, answer string, em
 	}
 	h = s.learnerSays(h, answer)
 	h = append(h, Message{"role": "user", "content": "[app] That was the learner's answer to the review question about " + label + " (id " + cid + "). Judge it as recalled, partial or forgotten, submit it now with record_checkpoint as review_results (action_turn is your question, evidence is the answer), then reply with brief feedback in at most two sentences. Do not ask a follow-up question here."})
-	reply, calls, err := RunAgent(ctx, s.tools, h, emit, true)
+	reply, h2, calls, err := RunAgent(ctx, s.tools, h, emit, true)
+	if h2 != nil {
+		h = h2
+	}
 	saveHistory(s.Vault, "", "review", h)
 	if err != nil {
 		return nil, err
@@ -497,7 +530,10 @@ func (s *Server) finishSession(ctx context.Context, why string, emit Emit, quick
 	h := loadHistory(s.Vault, cur, "learn")
 	h = append(h, Message{"role": "user", "content": "[app] " + why + " Wrap up quickly: submit a short final record only if something clearly unrecorded remains, and end the session with session_end. " +
 		"If this is an intake or baseline that is not finished, end it with a reason instead of writing an assessment. Then reply with a one-sentence goodbye."})
-	reply, _, err := RunAgent(ctx, s.tools, h, emit, false)
+	reply, h2, _, err := RunAgent(ctx, s.tools, h, emit, false)
+	if h2 != nil {
+		h = h2
+	}
 	if errors.Is(err, ErrCancelled) {
 		saveHistory(s.Vault, cur, "learn", h)
 		return nil, err
