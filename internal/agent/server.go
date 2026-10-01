@@ -183,11 +183,14 @@ func (s *Server) Notes() map[string]any {
 		m := mmap(c)
 		if st8, ok := stateMap[mstr(m, "state")]; ok {
 			e := map[string]any{"id": m["id"], "label": m["label"], "state": st8}
-			// 列表行要显示小节/摘要/下次复习，从概念详情拼过来
+			// 列表行要显示小节/摘要/下次复习，搜索要别名/原话/旧认知，从概念详情拼过来
 			if d := s.Concept(mstr(m, "id")); d != nil {
 				e["section"] = d["section"]
 				e["summary"] = d["understanding"]
 				e["next"] = d["next"]
+				e["aliases"] = d["aliases"]
+				e["quotes"] = d["quotes"]
+				e["was"] = d["was"]
 			}
 			out = append(out, e)
 		}
