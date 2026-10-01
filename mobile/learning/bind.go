@@ -53,6 +53,14 @@ type Error struct{ Message string }
 
 func (e *Error) Error() string { return e.Message }
 
+// HasKey reports whether any tutor model can authenticate.
+func HasKey() bool { return agent.HasKey() }
+
+// SetBuiltinKey stores the key the builtin tutors read.
+func SetBuiltinKey(key string) error {
+	return agent.SetBuiltinKey(key)
+}
+
 func toJSON(v any) string {
 	b, _ := json.Marshal(v)
 	return string(b)

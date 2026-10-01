@@ -1,6 +1,8 @@
 package agent
 
-// Facade helpers for mobile/bind: small exported wrappers over the unexported
+import "os"
+
+// Facade helpers for mobile/learning: small exported wrappers over the unexported
 // pieces a gomobile facade legitimately needs.
 
 // InitVault initializes a Learning Vault at path (idempotent).
@@ -32,4 +34,17 @@ func AddModel(name, baseURL, modelID, key string) string {
 // RemoveModel deletes a custom model, falling back to the builtin tutor.
 func RemoveModel(id string) {
 	removeModel(map[string]any{"id": id})
+}
+
+// HasKey reports whether any tutor model can authenticate.
+func HasKey() bool {
+	if _, err := os.Stat(KeyFileDefault); err == nil {
+		return true
+	}
+	return len(loadModelConf().Custom) > 0
+}
+
+// SetBuiltinKey stores the key the builtin tutors read.
+func SetBuiltinKey(key string) error {
+	return os.WriteFile(KeyFileDefault, []byte(key), 0o600)
 }
