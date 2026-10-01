@@ -179,7 +179,14 @@ func (s *Server) Notes() map[string]any {
 	for _, c := range asSlice(st["concepts"]) {
 		m := mmap(c)
 		if st8, ok := stateMap[mstr(m, "state")]; ok {
-			out = append(out, map[string]any{"id": m["id"], "label": m["label"], "state": st8})
+			e := map[string]any{"id": m["id"], "label": m["label"], "state": st8}
+			// 列表行要显示小节/摘要/下次复习，从概念详情拼过来
+			if d := s.Concept(mstr(m, "id")); d != nil {
+				e["section"] = d["section"]
+				e["summary"] = d["understanding"]
+				e["next"] = d["next"]
+			}
+			out = append(out, e)
 		}
 	}
 	return map[string]any{"concepts": out}
@@ -234,10 +241,15 @@ func (s *Server) Concept(cid string) map[string]any {
 	if len(quotes) > 4 {
 		quotes = quotes[len(quotes)-4:]
 	}
+	section := ""
+	if refs := asSlice(c["source_refs"]); len(refs) > 0 {
+		section = mstr(mmap(refs[len(refs)-1]), "section", "chapter")
+	}
 	return map[string]any{
 		"id": cid, "label": c["label"], "state": stateMap[mstr(d, "state")],
 		"understanding": understanding, "quotes": quotes, "was": was,
 		"related": related, "next": next, "aliases": orEmpty(c["aliases"]),
+		"section": section,
 	}
 }
 

@@ -30,9 +30,11 @@ var KeyFileDefault = filepath.Join(os.Getenv("HOME"), ".config", "deepseek", "ke
 // ModelsFile keeps models added in the app (mode 600, never leaves the machine).
 var ModelsFile = filepath.Join(os.Getenv("HOME"), ".config", "learning-os-proto", "models.json")
 
+// builtin models resolve their key file lazily so mobile Configure() can
+// redirect KeyFileDefault after package init.
 var builtinModels = []Model{
-	{ID: "ds-pro", Name: "DeepSeek v4-pro", BaseURL: "https://api.deepseek.com", ModelID: "deepseek-v4-pro", KeyFile: KeyFileDefault},
-	{ID: "ds-flash", Name: "DeepSeek flash", BaseURL: "https://api.deepseek.com", ModelID: "deepseek-flash", KeyFile: KeyFileDefault},
+	{ID: "ds-pro", Name: "DeepSeek v4-pro", BaseURL: "https://api.deepseek.com", ModelID: "deepseek-v4-pro"},
+	{ID: "ds-flash", Name: "DeepSeek flash", BaseURL: "https://api.deepseek.com", ModelID: "deepseek-flash"},
 }
 
 // CallLimit is how long one model call may take in total, however steadily it
@@ -82,7 +84,11 @@ func (m Model) key() (string, error) {
 	if m.Key != "" {
 		return m.Key, nil
 	}
-	b, err := os.ReadFile(m.KeyFile)
+	kf := m.KeyFile
+	if kf == "" {
+		kf = KeyFileDefault
+	}
+	b, err := os.ReadFile(kf)
 	return strings.TrimSpace(string(b)), err
 }
 
