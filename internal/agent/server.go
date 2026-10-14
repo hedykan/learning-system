@@ -164,13 +164,41 @@ func (s *Server) Courses() map[string]any {
 // Due is the review page's queue.
 func (s *Server) Due() map[string]any {
 	r := learnJSON(s.Vault, "review")
-	due := []any{}
+	active := mstr(learnJSON(s.Vault, "status"), "current_learning")
+	allowed := map[string]bool{}
+	for _, raw := range asSlice(learnJSON(s.Vault, "state")["concepts"]) {
+		m := mmap(raw)
+		for _, cur := range asSlice(m["curricula"]) {
+			if cur == active {
+				allowed[mstr(m, "id")] = true
+			}
+		}
+	}
+	due, upcoming := []any{}, []any{}
+	seen := map[string]bool{}
 	for _, d := range asSlice(r["due"]) {
 		m := mmap(d)
+		if !allowed[mstr(m, "concept")] {
+			continue
+		}
 		label := mstr(m, "label", "concept")
-		due = append(due, map[string]any{"concept": m["concept"], "label": label, "due": m["due"]})
+		due = append(due, map[string]any{"concept": m["concept"], "label": label, "due": m["due"], "practice": false})
+		seen[mstr(m, "concept")] = true
 	}
-	return map[string]any{"due": due, "upcoming": orEmpty(r["upcoming"]), "today": r["today"]}
+	for _, d := range asSlice(r["upcoming"]) {
+		m := mmap(d)
+		if !allowed[mstr(m, "concept")] {
+			continue
+		}
+		label := mstr(m, "label", "concept")
+		entry := map[string]any{"concept": m["concept"], "label": label, "due": m["due"], "practice": false}
+		upcoming = append(upcoming, entry)
+		if len(due) < 6 && !seen[mstr(m, "concept")] {
+			due = append(due, map[string]any{"concept": m["concept"], "label": label, "due": m["due"], "practice": true})
+			seen[mstr(m, "concept")] = true
+		}
+	}
+	return map[string]any{"due": due, "upcoming": upcoming, "today": r["today"]}
 }
 
 var stateMap = map[string]string{"stable": "stable", "fragile": "fragile", "developing": "developing"}

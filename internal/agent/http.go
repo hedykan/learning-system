@@ -69,6 +69,7 @@ func Serve(vaultRoot string, port int, staticDir string) error {
 	mux.HandleFunc("GET /api/source", h.json(func() (any, int) { return s.SourceText(), 200 }))
 	mux.HandleFunc("GET /api/turns", h.json(func() (any, int) { return s.Turns(), 200 }))
 	mux.HandleFunc("GET /api/courses", h.json(func() (any, int) { return s.Courses(), 200 }))
+	mux.HandleFunc("GET /api/home", h.json(func() (any, int) { return s.Home(), 200 }))
 	mux.HandleFunc("GET /api/course", h.json(func() (any, int) { return s.CourseState(), 200 }))
 	mux.HandleFunc("GET /api/concept/{id}", h.jsonWith(func(r *http.Request) (any, int) {
 		d := s.Concept(r.PathValue("id"))
