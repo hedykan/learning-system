@@ -22,10 +22,7 @@ type homeInput struct {
 // Home is the cross-course growth summary rendered by the islands home page.
 func (s *Server) Home() map[string]any {
 	courseView := s.Courses()
-	courses := []map[string]any{}
-	for _, raw := range asSlice(courseView["courses"]) {
-		courses = append(courses, mmap(raw))
-	}
+	courses := homeMaps(courseView["courses"])
 	state := learnJSON(s.Vault, "state")
 	concepts := []homeConcept{}
 	for _, raw := range asSlice(state["concepts"]) {
@@ -41,6 +38,21 @@ func (s *Server) Home() map[string]any {
 		Active: mstr(courseView, "active"), Courses: courses, Concepts: concepts,
 		Review: s.Due(), Overview: s.Overview(),
 	})
+}
+
+func homeMaps(value any) []map[string]any {
+	switch rows := value.(type) {
+	case []map[string]any:
+		return rows
+	case []any:
+		out := make([]map[string]any, 0, len(rows))
+		for _, row := range rows {
+			out = append(out, mmap(row))
+		}
+		return out
+	default:
+		return []map[string]any{}
+	}
 }
 
 func buildHome(in homeInput) map[string]any {

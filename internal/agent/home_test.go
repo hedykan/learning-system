@@ -66,6 +66,14 @@ func TestBuildHome(t *testing.T) {
 	})
 }
 
+func TestHomeMapsAcceptsTypedCourseRows(t *testing.T) {
+	rows := []map[string]any{{"id": "git", "title": "Pro Git"}}
+	got := homeMaps(rows)
+	if len(got) != 1 || got[0]["id"] != "git" {
+		t.Fatalf("typed course rows were lost: %#v", got)
+	}
+}
+
 func homeFixtureConcept(id, label, state, curriculum string, related, events []any) homeConcept {
 	if related == nil {
 		related = []any{}
