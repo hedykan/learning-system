@@ -66,6 +66,7 @@ func (s *Server) startReview() error {
 		return fmt.Errorf("%s", truncate(r.Output, 200))
 	}
 	forgetHistory(s.Vault, "", "review")
+	forgetReviewQuestions(s.Vault, "")
 	return nil
 }
 
@@ -73,6 +74,7 @@ func (s *Server) startReview() error {
 // resumes. It reports whether a review was open.
 func (s *Server) endReview(ctx context.Context, emit Emit) bool {
 	if !reviewing(s.Vault) {
+		forgetReviewQuestions(s.Vault, "")
 		return false
 	}
 	r := runCLI(s.Vault, "", "session", "end", "--json")
@@ -95,6 +97,7 @@ func (s *Server) endReview(ctx context.Context, emit Emit) bool {
 		}
 	}
 	forgetHistory(s.Vault, "", "review")
+	forgetReviewQuestions(s.Vault, "")
 	return true
 }
 
@@ -399,6 +402,7 @@ func (s *Server) Due() map[string]any {
 		}
 	}
 	due, upcoming := []any{}, []any{}
+	prepared := loadReviewQuestions(s.Vault).Questions
 	seen := map[string]bool{}
 	for _, d := range asSlice(r["due"]) {
 		m := mmap(d)
@@ -406,7 +410,11 @@ func (s *Server) Due() map[string]any {
 			continue
 		}
 		label := mstr(m, "label", "concept")
-		due = append(due, map[string]any{"concept": m["concept"], "label": label, "due": m["due"], "practice": false})
+		entry := map[string]any{"concept": m["concept"], "label": label, "due": m["due"], "practice": false}
+		if q, ok := prepared[mstr(m, "concept")]; ok && q.Recorded {
+			entry["ask"] = q.Ask
+		}
+		due = append(due, entry)
 		seen[mstr(m, "concept")] = true
 	}
 	for _, d := range asSlice(r["upcoming"]) {
@@ -416,13 +424,31 @@ func (s *Server) Due() map[string]any {
 		}
 		label := mstr(m, "label", "concept")
 		entry := map[string]any{"concept": m["concept"], "label": label, "due": m["due"], "practice": false}
+		if q, ok := prepared[mstr(m, "concept")]; ok && q.Recorded {
+			entry["ask"] = q.Ask
+		}
 		upcoming = append(upcoming, entry)
 		if len(due) < 6 && !seen[mstr(m, "concept")] {
-			due = append(due, map[string]any{"concept": m["concept"], "label": label, "due": m["due"], "practice": true})
+			practice := map[string]any{"concept": m["concept"], "label": label, "due": m["due"], "practice": true}
+			if q, ok := prepared[mstr(m, "concept")]; ok && q.Recorded {
+				practice["ask"] = q.Ask
+			}
+			due = append(due, practice)
 			seen[mstr(m, "concept")] = true
 		}
 	}
 	return map[string]any{"due": due, "upcoming": upcoming, "today": r["today"]}
+}
+
+// ReviewCurrent returns generated, unanswered questions for the active review
+// session. It never calls the model.
+func (s *Server) ReviewCurrent() map[string]any {
+	set := loadReviewQuestions(s.Vault)
+	questions := []ReviewQuestion{}
+	for _, q := range set.Questions {
+		questions = append(questions, q)
+	}
+	return map[string]any{"course": set.Course, "session": set.Session, "questions": questions}
 }
 
 var stateMap = map[string]string{"stable": "stable", "fragile": "fragile", "developing": "developing"}
@@ -702,6 +728,19 @@ func (s *Server) ReviewAsk(ctx context.Context, cid, label string, emit Emit) (m
 	if err := s.startReview(); err != nil {
 		return nil, err
 	}
+	if q, ok := loadReviewQuestions(s.Vault).Questions[cid]; ok && q.Ask != "" {
+		if !q.Recorded {
+			h := loadHistory(s.Vault, "", "review")
+			h = append(h,
+				Message{"role": "user", "content": "[app] Present the prepared retrieval question about " + label + " now."},
+				Message{"role": "assistant", "content": q.Ask})
+			appendTurn(s.Vault, "assistant", q.Ask)
+			saveHistory(s.Vault, "", "review", h)
+			q.Recorded = true
+			saveReviewQuestion(s.Vault, q)
+		}
+		return map[string]any{"ask": q.Ask, "prepared": true}, nil
+	}
 	h := loadHistory(s.Vault, "", "review")
 	h = append(h, Message{"role": "user", "content": "[app] The learner opened the review screen. Ask one retrieval question about the concept " + label + " (id " + cid + "), following the review workflow. Reply with the question only, one or two sentences, no greeting."})
 	q, h2, _, err := RunAgent(ctx, s.tools, h, emit, true)
@@ -712,7 +751,32 @@ func (s *Server) ReviewAsk(ctx context.Context, cid, label string, emit Emit) (m
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"ask": strings.TrimSpace(q)}, nil
+	q = strings.TrimSpace(q)
+	saveReviewQuestion(s.Vault, ReviewQuestion{Concept: cid, Label: label, Ask: q, Recorded: true})
+	return map[string]any{"ask": q, "prepared": true}, nil
+}
+
+// ReviewPrepare generates a question without adding it to the review
+// transcript. ReviewAsk records it only when the card is actually shown, so a
+// prefetched next question cannot get ahead of the learner's current answer.
+func (s *Server) ReviewPrepare(ctx context.Context, cid, label string, emit Emit) (map[string]any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.startReview(); err != nil {
+		return nil, err
+	}
+	if q, ok := loadReviewQuestions(s.Vault).Questions[cid]; ok && q.Ask != "" {
+		return map[string]any{"ask": q.Ask, "prepared": true}, nil
+	}
+	h := []Message{{"role": "system", "content": SystemPrompt(s.Vault)},
+		{"role": "user", "content": "[app] Prepare one retrieval question about the concept " + label + " (id " + cid + "), following the review workflow. Reply with the question only, one or two sentences, no greeting. Do not use tools."}}
+	q, _, _, err := RunAgent(ctx, s.tools, h, emit, false)
+	if err != nil {
+		return nil, err
+	}
+	q = strings.TrimSpace(q)
+	saveReviewQuestion(s.Vault, ReviewQuestion{Concept: cid, Label: label, Ask: q})
+	return map[string]any{"ask": q, "prepared": true}, nil
 }
 
 // ReviewAnswer judges the learner's answer and records the outcome.
@@ -736,6 +800,7 @@ func (s *Server) ReviewAnswer(ctx context.Context, cid, label, answer string, em
 	if err != nil {
 		return nil, err
 	}
+	forgetReviewQuestion(s.Vault, cid)
 	outcome := ""
 	for _, call := range calls {
 		if call.Name == "record_checkpoint" && call.OK {

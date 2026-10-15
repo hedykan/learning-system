@@ -66,6 +66,7 @@ func Serve(vaultRoot string, port int, staticDir string) error {
 	mux.HandleFunc("GET /api/models", h.json(func() (any, int) { return PublicModels(), 200 }))
 	mux.HandleFunc("GET /api/overview", h.json(func() (any, int) { return s.Overview(), 200 }))
 	mux.HandleFunc("GET /api/review", h.json(func() (any, int) { return s.Due(), 200 }))
+	mux.HandleFunc("GET /api/review/current", h.json(func() (any, int) { return s.ReviewCurrent(), 200 }))
 	mux.HandleFunc("GET /api/notes", h.json(func() (any, int) { return s.Notes(), 200 }))
 	mux.HandleFunc("GET /api/source", h.json(func() (any, int) { return s.SourceText(), 200 }))
 	mux.HandleFunc("GET /api/turns", h.json(func() (any, int) { return s.Turns(), 200 }))
@@ -127,6 +128,9 @@ func Serve(vaultRoot string, port int, staticDir string) error {
 	}))
 	mux.HandleFunc("POST /api/review/ask", h.stream(func(r *http.Request, b map[string]any, emit Emit) (map[string]any, error) {
 		return s.ReviewAsk(r.Context(), str(b, "concept"), orStr(b, "label", str(b, "concept")), emit)
+	}))
+	mux.HandleFunc("POST /api/review/prepare", h.stream(func(r *http.Request, b map[string]any, emit Emit) (map[string]any, error) {
+		return s.ReviewPrepare(r.Context(), str(b, "concept"), orStr(b, "label", str(b, "concept")), emit)
 	}))
 	mux.HandleFunc("POST /api/review/answer", h.stream(func(r *http.Request, b map[string]any, emit Emit) (map[string]any, error) {
 		return s.ReviewAnswer(r.Context(), str(b, "concept"), orStr(b, "label", str(b, "concept")), str(b, "answer"), emit)
