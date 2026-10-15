@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hedykan/learning-system/internal/vault"
@@ -71,6 +72,44 @@ func Serve(vaultRoot string, port int, staticDir string) error {
 	mux.HandleFunc("GET /api/courses", h.json(func() (any, int) { return s.Courses(), 200 }))
 	mux.HandleFunc("GET /api/home", h.json(func() (any, int) { return s.Home(), 200 }))
 	mux.HandleFunc("GET /api/course", h.json(func() (any, int) { return s.CourseState(), 200 }))
+	mux.HandleFunc("GET /api/courses/{id}", h.jsonWith(func(r *http.Request) (any, int) {
+		d := s.CourseDetail(r.PathValue("id"))
+		if d == nil {
+			return map[string]any{"error": "course not found"}, 404
+		}
+		return d, 200
+	}))
+	mux.HandleFunc("GET /api/courses/{id}/outline", h.courseRead(func(id string) any { return s.CourseOutline(id) }))
+	mux.HandleFunc("GET /api/courses/{id}/concepts", h.courseRead(func(id string) any { return s.CourseConcepts(id) }))
+	mux.HandleFunc("GET /api/courses/{id}/sources", h.courseRead(func(id string) any { return s.CourseSources(id, s.CourseOutline(id)) }))
+	mux.HandleFunc("GET /api/courses/{id}/moments", h.courseRead(func(id string) any { return s.CourseMoments(id) }))
+	mux.HandleFunc("GET /api/courses/{id}/progress", h.courseRead(func(id string) any {
+		d := s.CourseDetail(id)
+		return map[string]any{"course": id, "position": d["position"], "progress": d["progress"]}
+	}))
+	mux.HandleFunc("GET /api/courses/{id}/sessions", h.jsonWith(func(r *http.Request) (any, int) {
+		id := r.PathValue("id")
+		if !s.CourseExists(id) {
+			return map[string]any{"error": "course not found"}, 404
+		}
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		if limit <= 0 {
+			limit = 50
+		}
+		if limit > 200 {
+			limit = 200
+		}
+		include := r.URL.Query().Get("include_reviews") == "1" || r.URL.Query().Get("include_reviews") == "true"
+		rows := s.CourseSessions(id, include, limit)
+		return map[string]any{"course": id, "sessions": rows, "count": len(rows)}, 200
+	}))
+	mux.HandleFunc("GET /api/sessions/{id}", h.jsonWith(func(r *http.Request) (any, int) {
+		d := s.SessionDetail(r.PathValue("id"))
+		if d == nil {
+			return map[string]any{"error": "session not found"}, 404
+		}
+		return d, 200
+	}))
 	mux.HandleFunc("GET /api/concept/{id}", h.jsonWith(func(r *http.Request) (any, int) {
 		d := s.Concept(r.PathValue("id"))
 		if d == nil {
@@ -138,6 +177,16 @@ func (h *handler) jsonWith(f func(*http.Request) (any, int)) http.HandlerFunc {
 		w.WriteHeader(code)
 		_, _ = w.Write(body)
 	}
+}
+
+func (h *handler) courseRead(f func(string) any) http.HandlerFunc {
+	return h.jsonWith(func(r *http.Request) (any, int) {
+		id := r.PathValue("id")
+		if !h.s.CourseExists(id) {
+			return map[string]any{"error": "course not found"}, 404
+		}
+		return f(id), 200
+	})
 }
 
 // plainJSON answers a POST that takes and returns plain JSON.

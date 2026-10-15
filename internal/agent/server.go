@@ -161,6 +161,230 @@ func (s *Server) Courses() map[string]any {
 	return map[string]any{"active": active, "courses": out}
 }
 
+func frontmatterValue(text, key string) string {
+	re := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(key) + `:\s*(.*?)\s*$`)
+	m := re.FindStringSubmatch(text)
+	if len(m) < 2 {
+		return ""
+	}
+	return strings.Trim(strings.TrimSpace(m[1]), `"'`)
+}
+
+func sessionTime(id string) string {
+	re := regexp.MustCompile(`^session-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})`)
+	m := re.FindStringSubmatch(id)
+	if len(m) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s-%s-%sT%s:%s:%s", m[1], m[2], m[3], m[4], m[5], m[6])
+}
+
+// CourseSessions indexes finished session pages and the current runtime session
+// without activating the requested course.
+func (s *Server) CourseSessions(cid string, includeReviews bool, limit int) []map[string]any {
+	rows := []map[string]any{}
+	seen := map[string]bool{}
+	folder := filepath.Join(s.Vault, "Sessions")
+	entries, _ := os.ReadDir(folder)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".md") {
+			continue
+		}
+		b, err := os.ReadFile(filepath.Join(folder, entry.Name()))
+		if err != nil {
+			continue
+		}
+		head := string(b)
+		if len(head) > 6000 {
+			head = head[:6000]
+		}
+		if frontmatterValue(head, "curriculum") != cid {
+			continue
+		}
+		kind := frontmatterValue(head, "kind")
+		if kind == "" {
+			kind = "lesson"
+		}
+		if kind == "review" && !includeReviews {
+			continue
+		}
+		id := frontmatterValue(head, "id")
+		if id == "" {
+			id = strings.TrimSuffix(entry.Name(), ".md")
+		}
+		section := ""
+		if m := regexp.MustCompile(`(?m)^章节：\s*(.*?)\s*$`).FindStringSubmatch(head); len(m) > 1 && strings.TrimSpace(m[1]) != "未设置" {
+			section = strings.TrimSpace(m[1])
+		}
+		status := frontmatterValue(head, "termination")
+		if status == "" {
+			status = "completed"
+		}
+		rows = append(rows, map[string]any{"id": id, "course": cid, "kind": kind, "status": status,
+			"at": sessionTime(id), "section": section, "active": false})
+		seen[id] = true
+	}
+	st := learnJSON(s.Vault, "status")
+	for _, raw := range []any{st["active_session"], st["suspended_session"]} {
+		a := mmap(raw)
+		id, kind := mstr(a, "id"), mstr(a, "kind")
+		if id == "" || mstr(a, "curriculum") != cid || seen[id] || (kind == "review" && !includeReviews) {
+			continue
+		}
+		rows = append(rows, map[string]any{"id": id, "course": cid, "kind": kind, "status": "active",
+			"at": mstr(a, "started_at"), "section": mstr(a, "starting_chapter"), "active": true})
+	}
+	sort.Slice(rows, func(i, j int) bool { return mstr(rows[i], "at", "id") > mstr(rows[j], "at", "id") })
+	if limit > 0 && len(rows) > limit {
+		rows = rows[:limit]
+	}
+	return rows
+}
+
+// SessionDetail returns one immutable transcript by id.
+func (s *Server) SessionDetail(id string) map[string]any {
+	if !regexp.MustCompile(`^session-[A-Za-z0-9.-]+$`).MatchString(id) {
+		return nil
+	}
+	d := learnJSON(s.Vault, "session", "turns", "--session", id)
+	if d == nil {
+		return nil
+	}
+	var summary map[string]any
+	path := filepath.Join(s.Vault, "Sessions", id+".md")
+	if b, err := os.ReadFile(path); err == nil {
+		course := frontmatterValue(string(b), "curriculum")
+		for _, row := range s.CourseSessions(course, true, 0) {
+			if mstr(row, "id") == id {
+				summary = row
+				break
+			}
+		}
+	}
+	if summary == nil {
+		st := learnJSON(s.Vault, "status")
+		for _, raw := range []any{st["active_session"], st["suspended_session"]} {
+			a := mmap(raw)
+			if mstr(a, "id") == id {
+				summary = map[string]any{"id": id, "course": mstr(a, "curriculum"), "kind": mstr(a, "kind"),
+					"status": "active", "at": mstr(a, "started_at"), "section": mstr(a, "starting_chapter"), "active": true}
+				break
+			}
+		}
+	}
+	turns := []map[string]any{}
+	for _, raw := range asSlice(d["turns"]) {
+		t := mmap(raw)
+		role := mstr(t, "role")
+		if role == "user" || role == "assistant" {
+			turns = append(turns, map[string]any{"id": t["id"], "role": role, "text": mstr(t, "text"), "at": t["at"]})
+		}
+	}
+	if summary == nil {
+		summary = map[string]any{"id": id, "at": sessionTime(id)}
+	}
+	return map[string]any{"session": summary, "turns": turns}
+}
+
+func (s *Server) CourseOutline(cid string) map[string]any {
+	d := learnJSON(s.Vault, "curriculum", "outline", "show", cid)
+	return map[string]any{"course": cid, "status": d["status"], "type": d["type"], "nodes": orEmpty(d["nodes"])}
+}
+
+func (s *Server) CourseConcepts(cid string) map[string]any {
+	rows := []any{}
+	for _, raw := range asSlice(learnJSON(s.Vault, "state")["concepts"]) {
+		c := mmap(raw)
+		for _, cur := range asSlice(c["curricula"]) {
+			if cur == cid {
+				rows = append(rows, c)
+				break
+			}
+		}
+	}
+	return map[string]any{"course": cid, "concepts": rows}
+}
+
+func (s *Server) CourseSources(cid string, outline map[string]any) map[string]any {
+	ids := map[string]bool{cid: true}
+	for _, raw := range asSlice(outline["nodes"]) {
+		for _, res := range asSlice(mmap(raw)["resources"]) {
+			if id, ok := res.(string); ok {
+				ids[id] = true
+				continue
+			}
+			r := mmap(res)
+			id := mstr(r, "resource")
+			if id == "" {
+				id = mstr(mmap(r["locator"]), "resource")
+			}
+			ids[id] = id != ""
+		}
+	}
+	rows := []any{}
+	for _, raw := range asSlice(learnJSON(s.Vault, "source", "list")["sources"]) {
+		if ids[mstr(mmap(raw), "id")] {
+			rows = append(rows, raw)
+		}
+	}
+	return map[string]any{"course": cid, "sources": rows}
+}
+
+func (s *Server) CourseMoments(cid string) map[string]any {
+	rows := []any{}
+	for _, raw := range asSlice(s.Home()["moments"]) {
+		if mstr(mmap(raw), "course") == cid {
+			rows = append(rows, raw)
+		}
+	}
+	return map[string]any{"course": cid, "moments": rows}
+}
+
+// CourseDetail is a read-only snapshot and never activates the course.
+func (s *Server) courseRow(cid string) map[string]any {
+	var course map[string]any
+	for _, raw := range learnJSONList(s.Vault, "curriculum", "list") {
+		if mstr(mmap(raw), "id") == cid {
+			course = mmap(raw)
+			break
+		}
+	}
+	return course
+}
+
+func (s *Server) CourseExists(cid string) bool { return s.courseRow(cid) != nil }
+
+func (s *Server) CourseDetail(cid string) map[string]any {
+	course := s.courseRow(cid)
+	if course == nil {
+		return nil
+	}
+	outline := s.CourseOutline(cid)
+	nodes, done := asSlice(outline["nodes"]), 0
+	for _, raw := range nodes {
+		if mstr(mmap(raw), "status") == "completed" {
+			done++
+		}
+	}
+	percent := 0
+	if len(nodes) > 0 {
+		percent = done * 100 / len(nodes)
+	}
+	position := map[string]any{}
+	if b, err := os.ReadFile(filepath.Join(s.Vault, "Curriculum", cid, "current-position.md")); err == nil {
+		for _, key := range []string{"node", "chapter", "section", "current_concept", "last_completed"} {
+			position[key] = frontmatterValue(string(b), key)
+		}
+	}
+	goal := mmap(learnJSON(s.Vault, "curriculum", "goal", "show", cid))["goal"]
+	sessions := s.CourseSessions(cid, false, 0)
+	return map[string]any{"id": cid, "title": mstr(course, "title", "id"), "kind": course["kind"],
+		"active": mstr(learnJSON(s.Vault, "status"), "current_learning") == cid, "goal": goal,
+		"outline": outline, "position": position, "progress": map[string]any{"completed": done, "total": len(nodes), "percent": percent},
+		"concepts": s.CourseConcepts(cid)["concepts"], "sources": s.CourseSources(cid, outline)["sources"],
+		"sessions": sessions, "session_count": len(sessions)}
+}
+
 // Due is the review page's queue.
 func (s *Server) Due() map[string]any {
 	r := learnJSON(s.Vault, "review")
@@ -351,10 +575,12 @@ func (s *Server) Turns() map[string]any {
 	}
 	past := true
 	var d map[string]any
+	sid := ""
 	if active != nil && active["curriculum"] == cur {
-		d = learnJSON(s.Vault, "session", "turns", "--session", mstr(active, "id"))
+		sid = mstr(active, "id")
+		d = learnJSON(s.Vault, "session", "turns", "--session", sid)
 		past = false
-	} else if sid := s.latestSession(cur); sid != "" {
+	} else if sid = s.latestSession(cur); sid != "" {
 		d = learnJSON(s.Vault, "session", "turns", "--session", sid)
 	}
 	items := []map[string]any{}
@@ -378,7 +604,7 @@ func (s *Server) Turns() map[string]any {
 			}
 		}
 	}
-	return map[string]any{"turns": items, "past": past}
+	return map[string]any{"session": sid, "turns": items, "past": past}
 }
 
 // CourseState is where a course being built stands: its goal card, and the
