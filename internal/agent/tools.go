@@ -115,11 +115,17 @@ func (t *Tools) defs() []toolDef {
 		{"learn_review", "Concepts due for spaced review today and in the next 7 days.", nil,
 			func(t *Tools, a map[string]any) toolResult { return learn(t.Vault, 6000, "review", "--json") }},
 		{"concept_show", "One concept with its cognitive history.", [][2]string{{"concept", "string"}},
-			func(t *Tools, a map[string]any) toolResult { return learn(t.Vault, 6000, "state", "concept", str(a, "concept"), "--json") }},
+			func(t *Tools, a map[string]any) toolResult {
+				return learn(t.Vault, 6000, "state", "concept", str(a, "concept"), "--json")
+			}},
 		{"outline_show", "Show the outline with statuses.", nil,
-			func(t *Tools, a map[string]any) toolResult { return learn(t.Vault, 6000, "curriculum", "outline", "show", "--json") }},
+			func(t *Tools, a map[string]any) toolResult {
+				return learn(t.Vault, 6000, "curriculum", "outline", "show", "--json")
+			}},
 		{"position_set", "Move the position to an outline entry.", [][2]string{{"node", "string"}},
-			func(t *Tools, a map[string]any) toolResult { return learn(t.Vault, 6000, "curriculum", "position", "set", "--node", str(a, "node")) }},
+			func(t *Tools, a map[string]any) toolResult {
+				return learn(t.Vault, 6000, "curriculum", "position", "set", "--node", str(a, "node"))
+			}},
 		{"curriculum_complete", "Mark an outline entry completed.", [][2]string{{"node", "string"}, {"reason", "string"}},
 			func(t *Tools, a map[string]any) toolResult {
 				return learn(t.Vault, 6000, "curriculum", "complete", str(a, "node"), "--reason", str(a, "reason"), "--json")
@@ -129,9 +135,15 @@ func (t *Tools) defs() []toolDef {
 		{"session_turns", "List the recorded turns of the active session with their ids.", nil,
 			func(t *Tools, a map[string]any) toolResult { return learn(t.Vault, 6000, "session", "turns", "--json") }},
 		{"source_outline", "Headings of a source.", [][2]string{{"source", "string"}},
-			func(t *Tools, a map[string]any) toolResult { return learn(t.Vault, 6000, "source", "outline", str(a, "source"), "--json") }},
+			func(t *Tools, a map[string]any) toolResult {
+				return learn(t.Vault, 6000, "source", "outline", str(a, "source"), "--json")
+			}},
 		{"source_list", "List the materials stored in the vault.", nil,
 			func(t *Tools, a map[string]any) toolResult { return learn(t.Vault, 6000, "source", "list", "--json") }},
+		{"source_show", "Show one source's format, reading capabilities and length.", [][2]string{{"source", "string"}},
+			func(t *Tools, a map[string]any) toolResult {
+				return learn(t.Vault, 6000, "source", "show", str(a, "source"), "--json")
+			}},
 		{"source_add", "Import a textbook into the vault: a file path (PDF, EPUB, Markdown), or a website URL snapshotted page by page (prefix limits the paths, max_pages how many). A whole site takes minutes: warn the learner.",
 			[][2]string{{"path_or_url", "string"}, {"id", "string"}, {"title", "string"}, {"prefix", "string"}, {"max_pages", "integer"}}, toolSourceAdd},
 		{"source_attach", "Attach a part of a source to an outline entry (kind anchor/file/chapter/page/time/text).",
@@ -147,6 +159,42 @@ func (t *Tools) defs() []toolDef {
 			[][2]string{{"source", "string"}, {"kind", "string"}, {"value", "string"}},
 			func(t *Tools, a map[string]any) toolResult {
 				return learn(t.Vault, 6000, "source", "read", str(a, "source"), str(a, "kind"), str(a, "value"), "--json")
+			}},
+		{"source_search", "Search one source and return excerpts with jumpable locators.",
+			[][2]string{{"source", "string"}, {"query", "string"}, {"limit", "integer"}},
+			func(t *Tools, a map[string]any) toolResult {
+				return learn(t.Vault, 12000, "source", "search", str(a, "source"), str(a, "query"), "--limit", strconv.Itoa(num(a, "limit", 10)), "--json")
+			}},
+		{"source_context", "Read a bounded source window around the learner's current location; use this for questions about what is on screen.",
+			[][2]string{{"source", "string"}, {"kind", "string"}, {"value", "string"}, {"before", "integer"}, {"after", "integer"}, {"curriculum", "string"}},
+			func(t *Tools, a map[string]any) toolResult {
+				args := []string{"source", "context", str(a, "source"), str(a, "kind"), str(a, "value"), "--before", strconv.Itoa(num(a, "before", 0)), "--after", strconv.Itoa(num(a, "after", 0)), "--json"}
+				if c := str(a, "curriculum"); c != "" {
+					args = append(args, "--curriculum", c)
+				}
+				return learn(t.Vault, 18000, args...)
+			}},
+		{"source_progress", "Show self-read and tutor-guided coverage for a source.",
+			[][2]string{{"source", "string"}, {"curriculum", "string"}},
+			func(t *Tools, a map[string]any) toolResult {
+				args := []string{"source", "progress", "show", str(a, "source"), "--json"}
+				if c := str(a, "curriculum"); c != "" {
+					args = append(args, "--curriculum", c)
+				}
+				return learn(t.Vault, 6000, args...)
+			}},
+		{"source_reading_cover", "Record a bounded range that the tutor actually presented or discussed; this is exposure, not proof of understanding.",
+			[][2]string{{"source", "string"}, {"kind", "string"}, {"value", "string"}, {"mode", "string"}, {"learning_session", "string"}},
+			func(t *Tools, a map[string]any) toolResult {
+				mode := str(a, "mode")
+				if mode == "" {
+					mode = "guided"
+				}
+				args := []string{"source", "reading", "cover", str(a, "source"), str(a, "kind"), str(a, "value"), "--mode", mode, "--json"}
+				if s := str(a, "learning_session"); s != "" {
+					args = append(args, "--learning-session", s)
+				}
+				return learn(t.Vault, 6000, args...)
 			}},
 		{"record_checkpoint", "Submit an interpretation record for the active session.", [][2]string{{"record", "object"}},
 			func(t *Tools, a map[string]any) toolResult {
@@ -165,14 +213,18 @@ func (t *Tools) defs() []toolDef {
 				return runCLI(t.Vault, obj(a["goal_card"]), "curriculum", "goal", "set", "--file", "-", "--json")
 			}},
 		{"goal_show", "Show the goal card of the active course.", nil,
-			func(t *Tools, a map[string]any) toolResult { return learn(t.Vault, 6000, "curriculum", "goal", "show", "--json") }},
+			func(t *Tools, a map[string]any) toolResult {
+				return learn(t.Vault, 6000, "curriculum", "goal", "show", "--json")
+			}},
 		{"outline_set", "Submit a draft outline {\"nodes\": [...]}, each entry with why, prerequisites, concepts, serves.",
 			[][2]string{{"outline", "object"}},
 			func(t *Tools, a map[string]any) toolResult {
 				return runCLI(t.Vault, obj(a["outline"]), "curriculum", "outline", "set", "--file", "-", "--json")
 			}},
 		{"outline_review", "Review the draft: entries, goal coverage, likely known, ready_to_confirm.", nil,
-			func(t *Tools, a map[string]any) toolResult { return learn(t.Vault, 20000, "curriculum", "outline", "review", "--json") }},
+			func(t *Tools, a map[string]any) toolResult {
+				return learn(t.Vault, 20000, "curriculum", "outline", "review", "--json")
+			}},
 	}
 }
 

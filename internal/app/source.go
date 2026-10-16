@@ -3,11 +3,15 @@ package app
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 
 	"github.com/spf13/cobra"
 
 	"github.com/hedykan/learning-system/internal/curriculum"
 	"github.com/hedykan/learning-system/internal/locator"
+	"github.com/hedykan/learning-system/internal/reading"
 	"github.com/hedykan/learning-system/internal/session"
 	"github.com/hedykan/learning-system/internal/source"
 )
@@ -18,7 +22,53 @@ func (a *App) sourceCommand(explicitVault *string) *cobra.Command {
 	cmd := &cobra.Command{Use: "source", Short: "Add, read and attach learning resources"}
 	cmd.AddCommand(a.sourceAddCommand(explicitVault), a.sourceListCommand(explicitVault), a.sourceOutlineCommand(explicitVault),
 		a.sourceReadCommand(explicitVault), a.sourceAttachCommand(explicitVault), a.sourceDetachCommand(explicitVault),
-		a.sourceCheckCommand(explicitVault), a.sourceRefreshCommand(explicitVault))
+		a.sourceCheckCommand(explicitVault), a.sourceRefreshCommand(explicitVault), a.sourceShowCommand(explicitVault),
+		a.sourceNavigateCommand(explicitVault), a.sourceSearchCommand(explicitVault), a.sourceContextCommand(explicitVault),
+		a.sourcePositionCommand(explicitVault), a.sourceReadingCommand(explicitVault), a.sourceProgressCommand(explicitVault),
+		a.sourceRenderCommand(explicitVault))
+	return cmd
+}
+
+var renderName = regexp.MustCompile(`[^a-zA-Z0-9.-]+`)
+
+func (a *App) sourceRenderCommand(explicitVault *string) *cobra.Command {
+	var output string
+	var asJSON bool
+	cmd := &cobra.Command{Use: "render <source> <kind> <value>", Short: "Render one visual source unit, such as a scanned PDF page", Args: cobra.ExactArgs(3), RunE: func(cmd *cobra.Command, args []string) error {
+		root, err := resolveVault(*explicitVault)
+		if err != nil {
+			return err
+		}
+		ref, err := curriculum.Resolve(root, args[0])
+		if err != nil {
+			return err
+		}
+		loc, err := checkedReadingLocator(ref, args[1], args[2])
+		if err != nil {
+			return err
+		}
+		if output == "" {
+			name := renderName.ReplaceAllString(loc.Kind+"-"+loc.Value, "-") + ".png"
+			output = filepath.Join(root, ".learning", "tmp", "rendered", ref.ID, name)
+		} else if output, err = filepath.Abs(output); err != nil {
+			return err
+		}
+		if err := source.Render(ref.Adapter, ref.Path, loc, output); err != nil {
+			return err
+		}
+		info, err := os.Stat(output)
+		if err != nil {
+			return err
+		}
+		data := map[string]any{"source": ref.ID, "locator": loc, "path": output, "media_type": "image/png", "bytes": info.Size()}
+		if asJSON {
+			return writeJSON(cmd.OutOrStdout(), data)
+		}
+		fmt.Fprintln(cmd.OutOrStdout(), output)
+		return nil
+	}}
+	cmd.Flags().StringVar(&output, "output", "", "PNG output path (default: Vault temporary cache)")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
 	return cmd
 }
 
@@ -182,12 +232,247 @@ func (a *App) sourceReadCommand(explicitVault *string) *cobra.Command {
 				return err
 			}
 			if asJSON {
-				return writeJSON(cmd.OutOrStdout(), map[string]any{"status": "ok", "content": content})
+				previous, next, _ := sourceNeighbours(ref, loc)
+				extent, _ := source.ExtentOf(ref.Adapter, ref.Path)
+				return writeJSON(cmd.OutOrStdout(), map[string]any{"status": "ok", "source": ref.ID, "title": ref.Title,
+					"kind": ref.Kind, "content": content, "previous": previous, "next": next, "extent": extent})
 			}
 			_, err = fmt.Fprint(cmd.OutOrStdout(), content.Text)
 			return err
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	return cmd
+}
+
+func (a *App) sourceShowCommand(explicitVault *string) *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{Use: "show <source>", Short: "Show one source and its reading capabilities", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		root, err := resolveVault(*explicitVault)
+		if err != nil {
+			return err
+		}
+		ref, err := curriculum.Resolve(root, args[0])
+		if err != nil {
+			return err
+		}
+		extent, extentErr := source.ExtentOf(ref.Adapter, ref.Path)
+		data := map[string]any{"source": ref, "extent": extent}
+		if extentErr != nil {
+			data["extent_status"] = "unavailable"
+			data["extent_reason"] = extentErr.Error()
+		}
+		if asJSON {
+			return writeJSON(cmd.OutOrStdout(), data)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "%s (%s)\nReadable: %v\nLength: %d %s\n", ref.Title, ref.Kind, ref.Caps.Extractable, extent.Total, extent.Unit)
+		return nil
+	}}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	return cmd
+}
+
+func sourceNeighbours(ref curriculum.SourceRef, loc locator.Locator) (*locator.Locator, *locator.Locator, error) {
+	withResource := func(l locator.Locator) *locator.Locator { l.Resource = ref.ID; return &l }
+	if loc.Kind == "page" {
+		a, b, ok := locator.PageRange(loc.Value)
+		if !ok {
+			return nil, nil, loc.Validate()
+		}
+		extent, err := source.ExtentOf(ref.Adapter, ref.Path)
+		if err != nil {
+			return nil, nil, err
+		}
+		var previous, next *locator.Locator
+		if a > 1 {
+			previous = withResource(locator.Locator{Kind: "page", Value: fmt.Sprint(a - 1)})
+		}
+		if b < extent.Total {
+			next = withResource(locator.Locator{Kind: "page", Value: fmt.Sprint(b + 1)})
+		}
+		return previous, next, nil
+	}
+	sections, err := ref.Outline()
+	if err != nil {
+		return nil, nil, err
+	}
+	ordered := []locator.Locator{}
+	for _, section := range sections {
+		candidate := locator.Locator{Resource: ref.ID, Kind: "anchor", Value: section.Anchor}
+		if loc.Kind == "chapter" && section.Chapter != "" {
+			candidate.Kind, candidate.Value = "chapter", section.Chapter
+		}
+		if candidate.Kind == loc.Kind {
+			ordered = append(ordered, candidate)
+		}
+	}
+	for i, candidate := range ordered {
+		if candidate.Value != loc.Value {
+			continue
+		}
+		var previous, next *locator.Locator
+		if i > 0 {
+			p := ordered[i-1]
+			previous = &p
+		}
+		if i+1 < len(ordered) {
+			n := ordered[i+1]
+			next = &n
+		}
+		return previous, next, nil
+	}
+	return nil, nil, fmt.Errorf("%s %s is not in the source's navigable outline", loc.Kind, loc.Value)
+}
+
+func (a *App) sourceNavigateCommand(explicitVault *string) *cobra.Command {
+	var next, previous, asJSON bool
+	cmd := &cobra.Command{Use: "navigate <source> <kind> <value>", Short: "Read the next or previous page or section", Args: cobra.ExactArgs(3), RunE: func(cmd *cobra.Command, args []string) error {
+		if next == previous {
+			return fmt.Errorf("choose exactly one of --next or --previous")
+		}
+		root, err := resolveVault(*explicitVault)
+		if err != nil {
+			return err
+		}
+		ref, err := curriculum.Resolve(root, args[0])
+		if err != nil {
+			return err
+		}
+		loc := locator.Locator{Resource: ref.ID, Kind: args[1], Value: args[2]}
+		prevLoc, nextLoc, err := sourceNeighbours(ref, loc)
+		if err != nil {
+			return err
+		}
+		target := nextLoc
+		if previous {
+			target = prevLoc
+		}
+		if target == nil {
+			return fmt.Errorf("already at the %s of %s", map[bool]string{true: "end", false: "beginning"}[next], ref.Title)
+		}
+		content, err := ref.Read(*target)
+		if err != nil {
+			return err
+		}
+		p, n, _ := sourceNeighbours(ref, *target)
+		data := map[string]any{"source": ref.ID, "locator": target, "content": content, "previous": p, "next": n}
+		if asJSON {
+			return writeJSON(cmd.OutOrStdout(), data)
+		}
+		_, err = fmt.Fprint(cmd.OutOrStdout(), content.Text)
+		return err
+	}}
+	cmd.Flags().BoolVar(&next, "next", false, "move to the next page or section")
+	cmd.Flags().BoolVar(&previous, "previous", false, "move to the previous page or section")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	return cmd
+}
+
+func (a *App) sourceSearchCommand(explicitVault *string) *cobra.Command {
+	var limit int
+	var asJSON bool
+	cmd := &cobra.Command{Use: "search <source> <query>", Short: "Search a source and return jumpable locations", Args: cobra.ExactArgs(2), RunE: func(cmd *cobra.Command, args []string) error {
+		root, err := resolveVault(*explicitVault)
+		if err != nil {
+			return err
+		}
+		ref, err := curriculum.Resolve(root, args[0])
+		if err != nil {
+			return err
+		}
+		matches, err := source.Search(ref.Adapter, ref.Path, args[1], limit)
+		if err != nil {
+			return err
+		}
+		for i := range matches {
+			matches[i].Locator.Resource = ref.ID
+		}
+		if asJSON {
+			return writeJSON(cmd.OutOrStdout(), map[string]any{"source": ref.ID, "query": args[1], "matches": matches})
+		}
+		for _, m := range matches {
+			fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\t%s\n", m.Locator.Label("zh"), m.Heading, m.Excerpt)
+		}
+		return nil
+	}}
+	cmd.Flags().IntVar(&limit, "limit", 20, "maximum matches")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
+	return cmd
+}
+
+func (a *App) sourceContextCommand(explicitVault *string) *cobra.Command {
+	var before, after int
+	var curriculumID string
+	var asJSON bool
+	cmd := &cobra.Command{Use: "context <source> <kind> <value>", Short: "Read a bounded context window for the tutor", Args: cobra.ExactArgs(3), RunE: func(cmd *cobra.Command, args []string) error {
+		root, err := resolveVault(*explicitVault)
+		if err != nil {
+			return err
+		}
+		ref, err := curriculum.Resolve(root, args[0])
+		if err != nil {
+			return err
+		}
+		loc := locator.Locator{Resource: ref.ID, Kind: args[1], Value: args[2]}
+		current, err := ref.Read(loc)
+		if err != nil {
+			return err
+		}
+		previous, next := []source.Content{}, []source.Content{}
+		cursor := loc
+		for range before {
+			p, _, e := sourceNeighbours(ref, cursor)
+			if e != nil || p == nil {
+				break
+			}
+			c, e := ref.Read(*p)
+			if e != nil {
+				break
+			}
+			previous = append([]source.Content{c}, previous...)
+			cursor = *p
+		}
+		cursor = loc
+		for range after {
+			_, n, e := sourceNeighbours(ref, cursor)
+			if e != nil || n == nil {
+				break
+			}
+			c, e := ref.Read(*n)
+			if e != nil {
+				break
+			}
+			next = append(next, c)
+			cursor = *n
+		}
+		var progress any
+		if curriculumID == "" {
+			if _, active, e := curriculumArg(*explicitVault, nil); e == nil {
+				curriculumID = active
+			}
+		}
+		if curriculumID != "" {
+			st, e := reading.Load(root, curriculumID, ref.ID)
+			if e == nil {
+				progress = reading.Summarize(st)
+			}
+		}
+		data := map[string]any{"source": ref.ID, "title": ref.Title, "locator": loc, "current": current, "before": previous, "after": next, "reading_progress": progress}
+		if asJSON {
+			return writeJSON(cmd.OutOrStdout(), data)
+		}
+		for _, c := range previous {
+			fmt.Fprint(cmd.OutOrStdout(), c.Text)
+		}
+		fmt.Fprint(cmd.OutOrStdout(), current.Text)
+		for _, c := range next {
+			fmt.Fprint(cmd.OutOrStdout(), c.Text)
+		}
+		return nil
+	}}
+	cmd.Flags().IntVar(&before, "before", 0, "preceding reading units")
+	cmd.Flags().IntVar(&after, "after", 0, "following reading units")
+	cmd.Flags().StringVar(&curriculumID, "curriculum", "", "include reading progress for this curriculum")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "output JSON")
 	return cmd
 }

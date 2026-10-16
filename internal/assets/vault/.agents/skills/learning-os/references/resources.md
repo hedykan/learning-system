@@ -5,7 +5,7 @@ A curriculum's material is its primary resource; other material can be attached 
 | Capability | What to do |
 | --- | --- |
 | `extractable` | Read with `learn source read <source> <kind> <value> --json`; the text comes back as Markdown, with any `images` to look at. |
-| `needs_vision` | Read the pages yourself; for scanned pages use vision (see [curriculum outline](curriculum-outline.md)). |
+| `needs_vision` | `source read` first tries the text layer. If `needs_vision` remains true, render that exact page with `learn source render <source> page <N> --json` and use vision. |
 | `external` | There is no file. The learner brings the content: what they watched or read, a photo of the page, a transcript. |
 | `structured` | `learn source outline <source> --json` gives headings for a draft outline. |
 
@@ -23,6 +23,16 @@ A locator says where in a resource something is: `{"resource": "<id>", "kind": "
 | `text` | free text | anything else, e.g. “讲义第二部分” |
 
 Outline entries and textbook points take locators; child entries and points must lie inside their entry when positions can be compared. `learn source outline <id> --json` gives each section's `anchor` and, for e-books and folders, its `chapter` value. When an anchor appears in several files of a folder, the command says so: use the `chapter` form it suggests.
+
+## Reading and questions in context
+
+- `learn source show <source> --json` reports stable length and capabilities.
+- `source read` returns `previous` and `next`; `source navigate` reads either neighbour.
+- `learn source context <source> <kind> <value> --before 1 --after 1 --json` is the bounded window for a question about what is on screen. Never load a whole book when this window is enough.
+- `learn source search <source> <query> --json` returns jumpable citations.
+- `learn source progress show <source> --json` distinguishes self reading from guided coverage. A viewed or presented range is exposure, never proof of understanding.
+- When you actually present a bounded source range, record it with `learn source reading cover ... --mode guided`; do not record pages merely because you searched or fetched them.
+- Source-aware conversation turns carry their locator, selection and citations. Use those references to return the learner to the material; use normal interpretation records for actual understanding evidence.
 
 ## Code
 

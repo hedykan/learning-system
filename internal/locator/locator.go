@@ -172,6 +172,11 @@ func pageRange(v string) (int, int, bool) {
 	return a, b, a >= 1 && a <= b
 }
 
+// PageRange parses a page locator value. It is exported for reading-progress
+// projections, which merge viewed ranges without treating a jump as reading
+// every intervening page.
+func PageRange(v string) (int, int, bool) { return pageRange(v) }
+
 func seconds(v string) int {
 	total := 0
 	for _, part := range strings.Split(v, ":") {

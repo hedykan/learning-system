@@ -13,10 +13,12 @@ import (
 	"github.com/hedykan/learning-system/internal/assessment"
 	"github.com/hedykan/learning-system/internal/clock"
 	"github.com/hedykan/learning-system/internal/config"
+	"github.com/hedykan/learning-system/internal/conversation"
 	"github.com/hedykan/learning-system/internal/curriculum"
 	"github.com/hedykan/learning-system/internal/gitx"
 	"github.com/hedykan/learning-system/internal/i18n"
 	"github.com/hedykan/learning-system/internal/learner"
+	"github.com/hedykan/learning-system/internal/locator"
 	"github.com/hedykan/learning-system/internal/model"
 	"github.com/hedykan/learning-system/internal/policy"
 	"github.com/hedykan/learning-system/internal/projection"
@@ -726,7 +728,8 @@ func (a *App) sessionStartCommand(explicitVault *string) *cobra.Command {
 }
 
 func (a *App) sessionAppendCommand(explicitVault *string) *cobra.Command {
-	var role, text, file string
+	var role, text, file, sourceID, locatorKind, locatorValue, selection string
+	var citationValues []string
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use: "append", Short: "Append one raw conversation turn", Args: cobra.NoArgs,
@@ -752,7 +755,40 @@ func (a *App) sessionAppendCommand(explicitVault *string) *cobra.Command {
 				}
 				content = string(data)
 			}
-			result, err := session.Append(root, role, content, a.Now())
+			var sourceContext *conversation.SourceContext
+			if sourceID != "" || locatorKind != "" || locatorValue != "" || selection != "" || len(citationValues) > 0 {
+				sourceContext = &conversation.SourceContext{Source: sourceID, Selection: selection, Citations: []locator.Locator{}}
+				if sourceID != "" || locatorKind != "" || locatorValue != "" {
+					if sourceID == "" || locatorKind == "" || locatorValue == "" {
+						return fmt.Errorf("--source, --locator-kind, and --locator-value must be used together")
+					}
+					ref, err := curriculum.Resolve(root, sourceID)
+					if err != nil {
+						return err
+					}
+					loc := locator.Locator{Resource: sourceID, Kind: locatorKind, Value: locatorValue}
+					if err := ref.Validate(loc); err != nil {
+						return err
+					}
+					sourceContext.Locator = &loc
+				}
+				for _, raw := range citationValues {
+					parts := strings.SplitN(raw, ":", 3)
+					if len(parts) != 3 {
+						return fmt.Errorf("citation %q must be source:kind:value", raw)
+					}
+					ref, err := curriculum.Resolve(root, parts[0])
+					if err != nil {
+						return err
+					}
+					loc := locator.Locator{Resource: parts[0], Kind: parts[1], Value: parts[2]}
+					if err := ref.Validate(loc); err != nil {
+						return err
+					}
+					sourceContext.Citations = append(sourceContext.Citations, loc)
+				}
+			}
+			result, err := session.AppendWithContext(root, role, content, sourceContext, a.Now())
 			if err != nil {
 				return err
 			}
@@ -767,6 +803,11 @@ func (a *App) sessionAppendCommand(explicitVault *string) *cobra.Command {
 	cmd.Flags().StringVar(&role, "role", "", "turn role: user, assistant, or system")
 	cmd.Flags().StringVar(&text, "text", "", "turn content")
 	cmd.Flags().StringVar(&file, "file", "", "read turn content from a file")
+	cmd.Flags().StringVar(&sourceID, "source", "", "source shown with this turn")
+	cmd.Flags().StringVar(&locatorKind, "locator-kind", "", "source locator kind")
+	cmd.Flags().StringVar(&locatorValue, "locator-value", "", "source locator value")
+	cmd.Flags().StringVar(&selection, "selection", "", "learner-selected source text")
+	cmd.Flags().StringSliceVar(&citationValues, "citation", nil, "answer citation source:kind:value (repeatable)")
 	_ = cmd.MarkFlagRequired("role")
 	return cmd
 }

@@ -40,6 +40,28 @@ type Content struct {
 	NeedsVision bool            `json:"needs_vision"`
 }
 
+// Extent describes a source's stable reading units. A PDF uses physical
+// pages; reflowable documents use their ordered sections.
+type Extent struct {
+	Unit  string `json:"unit"`
+	Total int    `json:"total"`
+}
+
+// Match is a deterministic full-text search result with a jumpable locator.
+type Match struct {
+	Locator locator.Locator `json:"locator"`
+	Heading string          `json:"heading,omitempty"`
+	Excerpt string          `json:"excerpt"`
+}
+
+type extenter interface{ Extent(string) (Extent, error) }
+type searcher interface {
+	Search(string, string, int) ([]Match, error)
+}
+type renderer interface {
+	Render(string, locator.Locator, string) error
+}
+
 // ErrNoStructure means no draft outline can be derived; the Agent builds one.
 var ErrNoStructure = errors.New("resource has no structure to derive an outline from")
 
@@ -117,6 +139,38 @@ func ForKind(kind string) (Adapter, bool) {
 		}
 	}
 	return nil, false
+}
+
+// ExtentOf returns the source's stable reading length when it can be derived.
+func ExtentOf(a Adapter, path string) (Extent, error) {
+	if x, ok := a.(extenter); ok {
+		return x.Extent(path)
+	}
+	sections, err := a.Outline(path)
+	if err != nil {
+		return Extent{}, err
+	}
+	return Extent{Unit: "section", Total: len(sections)}, nil
+}
+
+// Search asks an adapter for deterministic source-local matches.
+func Search(a Adapter, path, query string, limit int) ([]Match, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if s, ok := a.(searcher); ok {
+		return s.Search(path, query, limit)
+	}
+	return nil, &Unsupported{"full-text search is not available for this source format"}
+}
+
+// Render writes a visual representation of one source unit. It is primarily
+// used for scanned PDF pages whose text layer is empty.
+func Render(a Adapter, path string, loc locator.Locator, output string) error {
+	if r, ok := a.(renderer); ok {
+		return r.Render(path, loc, output)
+	}
+	return &Unsupported{"visual rendering is not available for this source format"}
 }
 
 // requireKinds rejects locator kinds an adapter does not understand.

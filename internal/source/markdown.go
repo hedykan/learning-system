@@ -101,6 +101,22 @@ func (folderAdapter) Validate(path string, loc locator.Locator) error {
 	return err
 }
 
+func (folderAdapter) Extent(path string) (Extent, error) {
+	sections, err := (folderAdapter{}).Outline(path)
+	if err != nil {
+		return Extent{}, err
+	}
+	return Extent{Unit: "section", Total: len(sections)}, nil
+}
+
+func (folderAdapter) Search(path, query string, limit int) ([]Match, error) {
+	docs, err := folderDocs(path)
+	if err != nil {
+		return nil, err
+	}
+	return searchDocs(docs, true, query, limit), nil
+}
+
 var imageRef = regexp.MustCompile(`!\[[^\]]*\]\(([^)\s]+)`)
 
 // imagesIn lists Markdown image targets so the Agent can look at them.

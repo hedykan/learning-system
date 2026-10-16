@@ -57,7 +57,7 @@ learn curriculum detour end --outcome <completed|abandoned> --learned <text> [--
 
 ```bash
 learn session start [--domain <domain>] [--kind <baseline|lesson|review|practice>] [--depth <quick|standard|deep>] [--skip-baseline] [--json]
-learn session append --role <user|assistant|system> [--text <content>] [--json]
+learn session append --role <user|assistant|system> [--text <content>] [--source <id> --locator-kind <kind> --locator-value <value>] [--selection <text>] [--citation <source:kind:value>] [--json]
 learn session turns [--session <id>] [--role <user|assistant|system>] [--json]                          # v0.1.2
 learn session checkpoint --analysis-file <path|-> [--json]                                               # v0.1.2
 learn session end [--analysis-file <path|->] [--assessment-file <path|->] [--no-analysis --reason <reason>] [--json]
@@ -110,8 +110,20 @@ learn curriculum import --external --id <id> --title <name> [--url <url>] [--not
 learn source add <path> --id <id> [--title <name>] [--link] [--json]
 learn source add --external --id <id> --title <name> [--url <url>] [--note <text>] [--json]
 learn source list [--json]
+learn source show <source> [--json]
 learn source outline <source> [--json]
 learn source read <source> <kind> <value> [--json]
+learn source navigate <source> <kind> <value> (--next|--previous) [--json]
+learn source search <source> <query> [--limit <n>] [--json]
+learn source context <source> <kind> <value> [--before <n>] [--after <n>] [--curriculum <id>] [--json]
+learn source position show <source> [--curriculum <id>] [--json]
+learn source position set <source> <kind> <value> [--curriculum <id>] [--json]
+learn source reading start <source> [--curriculum <id>] [--mode self|guided|skim|reference] [--json]
+learn source reading progress <reading-session> <kind> <value> [--active-seconds <n>] [--json]
+learn source reading cover <source> <kind> <value> [--mode guided|self|skim|reference] [--learning-session <id>] [--active-seconds <n>] [--json]
+learn source reading end <reading-session> [--json]
+learn source progress show <source> [--curriculum <id>] [--json]
+learn source render <source> <kind> <value> [--output <png>] [--json]
 learn source attach <node> <source> <kind> <value> [--curriculum <id>] [--json]
 learn source detach <node> <source> [--curriculum <id>]
 learn source check [curriculum] [--json]
@@ -119,6 +131,9 @@ learn source check [curriculum] [--json]
 
 - 来源 ID：课程自身的资料用课程 ID；其他资料（`Sources/<id>/resource.yaml`）不会出现在课程列表中，可被多门课程共用。
 - 每份资料声明 `capabilities`：`structured`（可出草稿目录）、`extractable`（`source read` 可取文字，统一为 Markdown）、`needs_vision`、`external`（没有文件）。读不了时 `source read --json` 返回 `status: unsupported` 与原因。
+- `read` 返回前后定位与总长度；`navigate`、`search`、`context` 支持阅读器跳转和屏幕右侧导师的有界上下文。文字层 PDF 可直接读取和搜索；扫描页返回 `needs_vision: true`，再用 `render` 生成单页 PNG 供视觉模型读取。
+- 阅读状态保存在 `.learning/reading/<curriculum>/<source>.json`，与教材原件分离。`position` 只表示最后位置；`reading progress` 记录自读范围，`reading cover` 记录导师实际讲解范围。覆盖范围会去重，跳页不会推断中间页，且“接触过”不等于“已经理解”。
+- `session append` 可把当前教材定位、选中文字和引用定位写入原始对话，恢复会话时仍可还原当时在读哪里。
 - 定位 `locator`：`{"resource", "kind", "value"}`，kind 为 `page`（`42-45`）、`anchor`（`#slug`）、`file`（`a.md#L10-40`）、`time`（`3/05:20-48:00`）、`chapter`、`text`。目录条目与 `textbook_points` 可用 `locator` 代替 `pages`；可比较的位置必须落在上级条目内。每种资料只接受适合它的定位：PDF 为 page，Markdown 为 anchor、file，外部资料为 page、time、text。
 - `source attach` 只能挂到已确认大纲的条目上；挂载记录在 `Curriculum/<id>/resources.yaml`。`next --json` 的 `resources` 与 `status --json` 的 `node_resources` 列出当前小节的资料位置。
 - `source check` 报告失效的定位，以及外部课程中没有任何资料位置的条目（`unsourced`）。

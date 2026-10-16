@@ -182,6 +182,10 @@ type AppendResult struct {
 }
 
 func Append(root, role, content string, now time.Time) (AppendResult, error) {
+	return AppendWithContext(root, role, content, nil, now)
+}
+
+func AppendWithContext(root, role, content string, sourceContext *conversation.SourceContext, now time.Time) (AppendResult, error) {
 	if role != "user" && role != "assistant" && role != "system" {
 		return AppendResult{}, fmt.Errorf("invalid role %q", role)
 	}
@@ -206,7 +210,7 @@ func Append(root, role, content string, now time.Time) (AppendResult, error) {
 	if err != nil {
 		return AppendResult{}, fmt.Errorf("open active conversation: %w", err)
 	}
-	if _, err := f.WriteString(conversation.FormatEntry(ordinal, role, content, now)); err != nil {
+	if _, err := f.WriteString(conversation.FormatEntryWithContext(ordinal, role, content, sourceContext, now)); err != nil {
 		f.Close()
 		return AppendResult{}, fmt.Errorf("append conversation: %w", err)
 	}

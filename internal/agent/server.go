@@ -280,7 +280,11 @@ func (s *Server) SessionDetail(id string) map[string]any {
 		t := mmap(raw)
 		role := mstr(t, "role")
 		if role == "user" || role == "assistant" {
-			turns = append(turns, map[string]any{"id": t["id"], "role": role, "text": mstr(t, "text"), "at": t["at"]})
+			item := map[string]any{"id": t["id"], "role": role, "text": mstr(t, "text"), "at": t["at"]}
+			if t["source_context"] != nil {
+				item["source_context"] = t["source_context"]
+			}
+			turns = append(turns, item)
 		}
 	}
 	if summary == nil {
@@ -613,7 +617,11 @@ func (s *Server) Turns() map[string]any {
 	for _, t := range asSlice(d["turns"]) {
 		m := mmap(t)
 		text := mstr(m, "text")
-		items = append(items, map[string]any{"role": m["role"], "text": text})
+		item := map[string]any{"role": m["role"], "text": text}
+		if m["source_context"] != nil {
+			item["source_context"] = m["source_context"]
+		}
+		items = append(items, item)
 	}
 	if len(items) == 0 {
 		// 课前对话（还没 session_start）：回退到 runner 保存的对话，

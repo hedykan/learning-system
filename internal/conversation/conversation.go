@@ -4,6 +4,8 @@
 package conversation
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,16 +13,26 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/hedykan/learning-system/internal/locator"
 )
+
+type SourceContext struct {
+	Source    string            `json:"source,omitempty"`
+	Locator   *locator.Locator  `json:"locator,omitempty"`
+	Selection string            `json:"selection,omitempty"`
+	Citations []locator.Locator `json:"citations,omitempty"`
+}
 
 // Turn is one raw conversation entry.
 type Turn struct {
-	ID        string `json:"turn"`
-	Ordinal   int    `json:"ordinal"`
-	Role      string `json:"role"`
-	Timestamp string `json:"timestamp"`
-	Text      string `json:"text"`
-	Anchored  bool   `json:"anchored"`
+	ID            string         `json:"turn"`
+	Ordinal       int            `json:"ordinal"`
+	Role          string         `json:"role"`
+	Timestamp     string         `json:"timestamp"`
+	Text          string         `json:"text"`
+	Anchored      bool           `json:"anchored"`
+	SourceContext *SourceContext `json:"source_context,omitempty"`
 }
 
 // Conversation is a parsed Raw Conversation file.
@@ -104,6 +116,14 @@ func Parse(text string) (*Conversation, error) {
 				return nil, fmt.Errorf("conversation turn %s has mismatched anchor %q", current.ID, trimmed)
 			}
 			current.Anchored = true
+		case strings.HasPrefix(trimmed, "<!-- learning-source:") && strings.HasSuffix(trimmed, " -->"):
+			encoded := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "<!-- learning-source:"), " -->"))
+			if raw, err := base64.RawURLEncoding.DecodeString(encoded); err == nil {
+				var context SourceContext
+				if json.Unmarshal(raw, &context) == nil {
+					current.SourceContext = &context
+				}
+			}
 		case trimmed == ">":
 			lines = append(lines, "")
 		case strings.HasPrefix(trimmed, "> "):
@@ -196,9 +216,19 @@ func (c *Conversation) RoleText(role string) string {
 
 // FormatEntry renders a new v0.1.2 turn entry with its heading ID and anchor.
 func FormatEntry(ordinal int, role, content string, now time.Time) string {
+	return FormatEntryWithContext(ordinal, role, content, nil, now)
+}
+
+func FormatEntryWithContext(ordinal int, role, content string, context *SourceContext, now time.Time) string {
 	id := TurnID(ordinal)
 	quoted := "> " + strings.ReplaceAll(content, "\n", "\n> ")
-	return fmt.Sprintf("\n## %s — %s — %s\n\n%s\n\n^%s\n", id, now.UTC().Format(time.RFC3339Nano), role, quoted, id)
+	metadata := ""
+	if context != nil {
+		if raw, err := json.Marshal(context); err == nil {
+			metadata = "\n<!-- learning-source: " + base64.RawURLEncoding.EncodeToString(raw) + " -->\n"
+		}
+	}
+	return fmt.Sprintf("\n## %s — %s — %s\n\n%s\n%s\n^%s\n", id, now.UTC().Format(time.RFC3339Nano), role, quoted, metadata, id)
 }
 
 // Normalize trims and collapses whitespace for quote comparison.

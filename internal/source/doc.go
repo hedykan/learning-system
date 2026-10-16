@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/hedykan/learning-system/internal/locator"
 )
@@ -193,6 +194,73 @@ func (a docAdapter) Validate(path string, loc locator.Locator) error {
 	}
 	_, err = readDocs(docs, loc)
 	return err
+}
+
+func (a docAdapter) Extent(path string) (Extent, error) {
+	sections, err := a.Outline(path)
+	if err != nil {
+		return Extent{}, err
+	}
+	return Extent{Unit: "section", Total: len(sections)}, nil
+}
+
+func (a docAdapter) Search(path, query string, limit int) ([]Match, error) {
+	docs, err := a.docs(path)
+	if err != nil {
+		return nil, err
+	}
+	return searchDocs(docs, a.chapters, query, limit), nil
+}
+
+func searchDocs(docs []doc, chapters bool, query string, limit int) []Match {
+	needle := strings.ToLower(strings.TrimSpace(query))
+	if needle == "" {
+		return []Match{}
+	}
+	var out []Match
+	for _, d := range docs {
+		for i, h := range d.heads {
+			text := d.section(i)
+			at := strings.Index(strings.ToLower(text), needle)
+			if at < 0 {
+				continue
+			}
+			kind, value := "anchor", "#"+Slug(h.title)
+			if len(h.ids) > 0 {
+				value = "#" + h.ids[0]
+			}
+			if chapters {
+				kind, value = "chapter", d.name+value
+			}
+			out = append(out, Match{Locator: locator.Locator{Kind: kind, Value: value}, Heading: h.title, Excerpt: excerptAt(text, at, len(query))})
+			if len(out) >= limit {
+				return out
+			}
+		}
+	}
+	return out
+}
+
+func excerptAt(text string, at, n int) string {
+	if at < 0 {
+		at = 0
+	}
+	start := max(0, at-80)
+	end := min(len(text), at+n+140)
+	for start < at && !utf8.RuneStart(text[start]) {
+		start++
+	}
+	for end < len(text) && !utf8.RuneStart(text[end]) {
+		end++
+	}
+	s := strings.Join(strings.Fields(text[start:end]), " ")
+	if start > 0 {
+		s = "…" + s
+	}
+	if end < len(text) {
+		s += "…"
+	}
+	return s
 }
 
 // outlineOfDocs lists level 1 and 2 headings in document order.
